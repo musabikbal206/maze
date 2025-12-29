@@ -595,10 +595,19 @@
                 this.scene.background = new THREE.Color(0x020617);
                 this.scene.fog = new THREE.Fog(0x020617, 2, 20);
                 this.camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.1, 100);
-                this.scene.add(new THREE.AmbientLight(0xffffff, 0.4));
+                
+                // Add Lights & Mark as Persistent
+                const ambient = new THREE.AmbientLight(0xffffff, 0.4);
+                ambient.userData.keep = true;
+                this.scene.add(ambient);
+
                 this.pl = new THREE.PointLight(0x38bdf8, 1.5, 12);
+                this.pl.userData.keep = true;
                 this.scene.add(this.pl);
                 
+                // Camera is naturally persistent
+                this.camera.userData.keep = true;
+
                 // Textures
                 this.wallTex = TexGen.createWall();
                 this.floorTex = TexGen.createFloor();
@@ -628,9 +637,15 @@
             },
             build(map, w, h) {
                 if (!this.scene) this.init();
+                
+                // Cleanup: Remove objects that are NOT marked as 'keep'
                 for(let i = this.scene.children.length - 1; i >= 0; i--) {
                      const c = this.scene.children[i];
-                     if(!c.isLight && !c.isCamera) { this.scene.remove(c); if(c.geometry) c.geometry.dispose(); }
+                     if(!c.userData.keep) { 
+                         this.scene.remove(c); 
+                         if(c.geometry) c.geometry.dispose(); 
+                         if(c.material) c.material.dispose();
+                     }
                 }
                 
                 // Player Mesh
@@ -743,7 +758,8 @@
                 const oy = (cvs.height - h*scale)/2;
                 for(let z=0; z<h; z++) for(let x=0; x<w; x++) {
                     const t = map[z][x];
-                    if(isMini && t!==CONST.WALL && t!==CONST.END) continue;
+                    // CHANGED: Include START (t===2) in minimap rendering
+                    if(isMini && t!==CONST.WALL && t!==CONST.END && t!==CONST.START) continue;
                     this.drawCell(ctx, t, ox+x*scale, oy+z*scale, scale);
                 }
                 const px = ox + p.x*scale; const py = oy + p.z*scale;
@@ -798,7 +814,29 @@
                 let found=false;
                 for(let z=0;z<this.h;z++) for(let x=0;x<this.w;x++) if(this.map[z][x]===CONST.START) { this.player.x=x+0.5; this.player.z=z+0.5; found=true; }
                 if(!found){this.player.x=1.5;this.player.z=1.5;}
-                this.player.dir = Math.PI;
+                
+                // --- NEW ORIENTATION LOGIC ---
+                // Find open neighbor to face
+                const startX = Math.floor(this.player.x);
+                const startZ = Math.floor(this.player.z);
+                
+                // Helper to check valid path
+                const isPath = (x, z) => {
+                    if (x < 0 || x >= this.w || z < 0 || z >= this.h) return false;
+                    return this.map[z][x] !== CONST.WALL;
+                };
+
+                // Default to South (Math.PI)
+                let startDir = Math.PI;
+
+                if (isPath(startX, startZ - 1)) startDir = 0;           // Face North
+                else if (isPath(startX, startZ + 1)) startDir = Math.PI; // Face South
+                else if (isPath(startX - 1, startZ)) startDir = Math.PI/2; // Face West
+                else if (isPath(startX + 1, startZ)) startDir = -Math.PI/2; // Face East
+
+                this.player.dir = startDir;
+                // -----------------------------
+
                 GFX.build(this.map, this.w, this.h);
                 document.querySelectorAll('.ui-screen').forEach(e => e.classList.add('hidden'));
                 document.getElementById('screen-game').classList.remove('hidden');
