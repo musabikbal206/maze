@@ -3,12 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Mazemazing 3D</title>
+    <title>Mazemazing 3D Pro</title>
     
     <!-- PWA Settings -->
     <meta name="theme-color" content="#020617">
-    <link rel="manifest" href="manifest.json">
-    <link rel="icon" type="image/svg+xml" href="icon.svg">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
@@ -32,16 +30,16 @@
         .interactive { pointer-events: auto; }
         .hidden { display: none !important; }
 
-        /* Minimap - Relative positioning inside flex container */
+        /* Minimap */
         #minimap-wrapper {
-            width: 180px; height: 180px;
+            width: 240px; height: 240px; /* Increased size */
             background: rgba(15, 23, 42, 0.9);
             border: 2px solid rgba(255,255,255,0.1);
-            border-radius: 12px; /* Square with rounded corners */
+            border-radius: 12px;
             overflow: hidden;
-            display: none; /* Toggled by JS */
+            display: none;
             box-shadow: 0 0 20px rgba(0,0,0,0.5);
-            /* Removed absolute positioning to let flexbox handle it */
+            margin-top: 10px;
         }
 
         /* Timer */
@@ -61,12 +59,12 @@
             box-shadow: 0 4px 12px rgba(0,0,0,0.3);
         }
 
-        /* --- SINGLE JOYSTICK --- */
+        /* Controls */
         #controls-ui { display: none; width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 50; pointer-events: none; }
         
         .stick-zone {
             position: absolute; bottom: 40px; left: 40px; 
-            width: 160px; height: 160px;
+            width: 140px; height: 140px;
             pointer-events: auto;
         }
 
@@ -82,7 +80,7 @@
         }
         
         .stick-thumb {
-            width: 70px; height: 70px;
+            width: 60px; height: 60px;
             background: radial-gradient(circle at 30% 30%, #22d3ee, #0891b2);
             border-radius: 50%;
             position: absolute;
@@ -93,39 +91,30 @@
             transition: transform 0.05s linear;
         }
 
-        /* Editor Grid */
+        /* Editor */
         .grid-cell { box-sizing: border-box; border: 1px solid rgba(255,255,255,0.05); cursor: pointer; }
         .c-wall { background: #475569; }
         .c-path { background: #0f172a; }
         .c-start { background: #10b981; }
         .c-end { background: #ef4444; }
 
-        /* Scrollable Viewport logic */
-        #editor-viewport {
-            overflow: auto; 
-            touch-action: pan-x pan-y;
-            cursor: grab;
-        }
-        #editor-viewport.mode-draw {
-            touch-action: none; 
-            cursor: crosshair;
-        }
-        
-        #editor-grid {
-            display: grid;
-            box-shadow: 0 0 50px rgba(0,0,0,0.5);
-            margin: auto;
-            transform-origin: top left;
-        }
+        #editor-viewport { overflow: auto; touch-action: pan-x pan-y; cursor: grab; }
+        #editor-viewport.mode-draw { touch-action: none; cursor: crosshair; }
+        #editor-grid { display: grid; box-shadow: 0 0 50px rgba(0,0,0,0.5); margin: auto; transform-origin: top left; }
 
-        /* Code Input Animation */
         @keyframes glow {
             0% { box-shadow: 0 0 5px rgba(34, 211, 238, 0.2); }
             50% { box-shadow: 0 0 20px rgba(34, 211, 238, 0.6); }
             100% { box-shadow: 0 0 5px rgba(34, 211, 238, 0.2); }
         }
-        .input-glow:focus {
-            animation: glow 2s infinite;
+        .input-glow:focus { animation: glow 2s infinite; }
+        
+        /* Mobile specific adjustments */
+        @media (max-width: 768px) {
+            #minimap-wrapper { width: 160px; height: 160px; }
+            .btn-game-ui span { display: none; }
+            .btn-game-ui { padding: 8px 12px; }
+            #ui-code-display { font-size: 0.65rem; padding: 4px 8px; }
         }
     </style>
 </head>
@@ -163,7 +152,7 @@
     <div id="screen-menu" class="ui-screen interactive bg-slate-950/95 flex items-center justify-center overflow-y-auto">
         <div class="text-center max-w-md w-full p-6 my-auto">
             <h1 class="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-600 mb-2">MAZEMAZING</h1>
-            <p class="text-slate-500 mb-8 font-mono text-sm">3D / 2D Engine</p>
+            <p class="text-slate-500 mb-8 font-mono text-sm">3D / 2D Engine • Pro</p>
 
             <div class="space-y-3">
                 <button onclick="Game.start('easy')" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-4 rounded-xl font-bold shadow-lg transition transform active:scale-95">Easy (10x10)</button>
@@ -200,6 +189,12 @@
                 <button onclick="Editor.open()" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 py-3 rounded-xl font-bold shadow-lg flex items-center justify-center gap-2">
                     <i class="ph ph-pencil-simple"></i> Map Editor
                 </button>
+                
+                <div class="flex justify-center mt-4">
+                    <button onclick="Sfx.toggle()" class="text-slate-500 hover:text-white transition flex items-center gap-2 text-sm font-bold">
+                        <i id="icon-sound" class="ph ph-speaker-high text-lg"></i> <span id="txt-sound">Sound On</span>
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -207,23 +202,30 @@
     <!-- Game UI -->
     <div id="screen-game" class="ui-screen hidden justify-between p-4 z-40">
         <div class="flex justify-between w-full interactive items-start">
-            <!-- Left Side controls -->
-            <div class="flex flex-col gap-2">
-                <button onclick="Game.toggleView()" class="bg-slate-900/80 backdrop-blur text-cyan-400 border border-cyan-900/50 px-4 py-2 rounded-lg font-bold shadow-lg flex items-center gap-2 text-sm w-fit">
-                    <i class="ph ph-eye text-lg"></i> <span id="lbl-view">2D Map</span>
+            <!-- Top Left: Exit & Code Info -->
+            <div class="flex flex-col md:flex-row md:items-center gap-2 md:gap-4">
+                <button onclick="Game.quit()" class="bg-red-950/80 backdrop-blur text-red-200 border border-red-900/50 px-3 py-2 rounded-lg font-bold shadow-lg text-sm transition active:scale-95 flex items-center gap-2 btn-game-ui w-fit">
+                    <i class="ph ph-sign-out text-lg"></i><span>Exit</span>
                 </button>
-                <!-- Current Code Display -->
-                <div id="ui-code-display" class="hidden bg-slate-900/60 backdrop-blur text-slate-400 border border-slate-800 px-3 py-1 rounded-lg text-xs font-mono">
-                    CODE: <span class="text-white font-bold" id="ui-code-val">---</span>
+                 <div id="ui-code-display" class="hidden bg-slate-900/60 backdrop-blur text-slate-400 border border-slate-800 px-3 py-2 rounded-lg text-xs font-mono shadow-md whitespace-nowrap w-fit">
+                    <span class="opacity-50 mr-1">MAP:</span> <span class="text-cyan-400 font-bold tracking-wider" id="ui-code-val">---</span>
                 </div>
             </div>
 
-            <!-- Right Side controls: Exit & Minimap -->
+            <!-- Top Right: View Controls & Minimap -->
             <div class="flex flex-col items-end gap-2">
-                <button onclick="Game.quit()" class="bg-red-950/80 backdrop-blur text-red-200 border border-red-900/50 px-4 py-2 rounded-lg font-bold shadow-lg text-sm">
-                    Exit
-                </button>
-                <!-- Minimap Moved Here -->
+                <!-- Toggle Row -->
+                <div class="flex gap-2">
+                    <!-- 2D/3D Toggle -->
+                    <button onclick="Game.toggleDimension()" class="bg-slate-900/80 backdrop-blur text-cyan-400 border border-cyan-900/50 px-3 py-2 rounded-lg font-bold shadow-lg flex items-center gap-2 text-sm transition active:scale-95 btn-game-ui">
+                        <i id="icon-dim" class="ph ph-cube text-lg"></i> <span id="lbl-dim">3D View</span>
+                    </button>
+                    <!-- POV Toggle (1st/3rd) -->
+                    <button id="btn-pov" onclick="Game.toggleCamera()" class="bg-slate-900/80 backdrop-blur text-emerald-400 border border-emerald-900/50 px-3 py-2 rounded-lg font-bold shadow-lg flex items-center gap-2 text-sm transition active:scale-95 btn-game-ui">
+                        <i id="icon-pov" class="ph ph-person text-lg"></i> <span id="lbl-pov">3rd Person</span>
+                    </button>
+                </div>
+
                 <div id="minimap-wrapper">
                     <canvas id="minimap"></canvas>
                 </div>
@@ -233,7 +235,6 @@
 
     <!-- Editor UI -->
     <div id="screen-editor" class="ui-screen hidden bg-slate-900 z-50 flex-col interactive">
-        <!-- Header -->
         <div class="h-14 bg-slate-800 border-b border-slate-700 flex items-center justify-between px-4 shrink-0 shadow-md">
             <h2 class="font-bold text-cyan-400 flex items-center gap-2"><i class="ph ph-grid-nine"></i> Editor</h2>
             <div class="flex gap-2">
@@ -244,15 +245,9 @@
             </div>
         </div>
 
-        <!-- Main Layout: Flex-Col-Reverse on Mobile, Flex-Row on Desktop -->
         <div class="flex flex-1 overflow-hidden flex-col-reverse md:flex-row">
-            
-            <!-- Toolbar (Bottom on Mobile, Left on Desktop) -->
             <div class="w-full md:w-56 h-auto md:h-full bg-slate-800 border-t md:border-t-0 md:border-r border-slate-700 flex flex-row md:flex-col flex-wrap gap-2 p-2 shrink-0 overflow-y-auto content-start">
-                
-                <!-- Group 1: Modes & Tools -->
                 <div class="flex gap-2 w-full md:w-full items-stretch h-10 md:h-auto">
-                    <!-- Mode Switch -->
                     <div class="flex bg-slate-900 rounded p-1 w-[30%] md:w-full shrink-0">
                         <button onclick="Editor.setMode('draw')" id="btn-mode-draw" class="flex-1 rounded text-slate-400 hover:text-white transition flex justify-center items-center text-xs font-bold bg-cyan-700 text-white">
                             <i class="ph ph-pencil-simple text-lg md:text-base"></i> <span class="hidden md:inline ml-2">DRAW</span>
@@ -261,8 +256,6 @@
                             <i class="ph ph-hand-grabbing text-lg md:text-base"></i> <span class="hidden md:inline ml-2">PAN</span>
                         </button>
                     </div>
-
-                    <!-- Tools Row -->
                     <div class="flex gap-1 flex-1 md:w-full md:grid md:grid-cols-1">
                          <button onclick="Editor.setTool(1)" id="t-1" class="tool-btn flex-1 bg-slate-700 rounded flex flex-col md:flex-row items-center justify-center gap-2 border border-transparent text-slate-300 text-[10px] md:text-sm transition">
                             <div class="w-4 h-4 md:w-6 md:h-6 bg-slate-500 border border-slate-400"></div> <span class="hidden md:inline">Wall</span>
@@ -280,8 +273,6 @@
                 </div>
 
                 <div class="h-px bg-slate-700 my-1 w-full hidden md:block"></div>
-
-                <!-- Group 2: Sliders -->
                 <div class="flex gap-2 w-full">
                      <div class="w-1/2 md:w-full px-1">
                         <div class="flex justify-between text-[10px] text-slate-500 font-bold mb-1">
@@ -289,7 +280,6 @@
                         </div>
                         <input type="range" min="10" max="50" step="5" value="10" onchange="Editor.resize(this.value)" class="w-full accent-cyan-500 h-2 bg-slate-900 rounded-lg appearance-none cursor-pointer">
                     </div>
-                    
                     <div class="w-1/2 md:w-full px-1">
                         <div class="flex justify-between text-[10px] text-slate-500 font-bold mb-1">
                             <span>ZOOM</span>
@@ -297,12 +287,8 @@
                         <input type="range" min="1" max="3" step="0.1" value="1" oninput="Editor.setZoom(this.value)" class="w-full accent-cyan-500 h-2 bg-slate-900 rounded-lg appearance-none cursor-pointer">
                     </div>
                 </div>
-
                 <div class="h-px bg-slate-700 my-1 w-full hidden md:block"></div>
-
-                <!-- Group 3: Generator & Clear -->
                 <div class="flex gap-2 w-full items-center">
-                    <!-- Editor Generator -->
                     <div class="bg-slate-900 p-1 md:p-2 rounded border border-slate-700 flex-1 md:w-full">
                         <div class="text-[10px] text-slate-500 font-bold mb-1 uppercase tracking-wider hidden md:block">Generator</div>
                         <div class="flex gap-1 items-center">
@@ -318,15 +304,12 @@
                             <button onclick="Editor.generateFromCode()" class="bg-cyan-700 text-white text-[10px] h-6 px-2 rounded font-bold">GEN</button>
                         </div>
                     </div>
-                    
                     <button onclick="Editor.clear()" class="md:mt-auto border border-red-900 text-red-400 p-1 md:p-2 rounded text-[10px] md:text-xs hover:bg-red-900/20 font-bold h-full md:h-auto w-12 md:w-full flex flex-col items-center justify-center">
                         <i class="ph ph-trash text-lg md:hidden"></i>
                         <span class="hidden md:inline">CLEAR MAP</span>
                     </button>
                 </div>
             </div>
-
-            <!-- Viewport -->
             <div id="editor-viewport" class="flex-1 bg-slate-950 relative p-4 md:p-8 mode-draw overflow-hidden">
                 <div id="editor-grid"></div>
             </div>
@@ -347,71 +330,126 @@
         // PWA Registration
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js')
-                    .then(reg => console.log('SW Registered', reg.scope))
-                    .catch(err => console.log('SW Failed', err));
+                navigator.serviceWorker.register('./sw.js').catch(()=>{});
             });
         }
-
-        /**
-         * Maze Game with Seeds, Timer, Random Generation, and Random Start/End
-         */
 
         const CONST = {
             WALL: 1, PATH: 0, START: 2, END: 3,
             CELL_SIZE: 4, 
-            SPEED_3D: 0.05,
-            SPEED_2D: 0.15,
-            ROT_SPEED: 0.04,
-            COLLISION_RADIUS: 0.15 
+            SPEED_3D: 0.05, SPEED_2D: 0.15,
+            ROT_SPEED: 0.04, COLLISION_RADIUS: 0.15
         };
 
-        // --- UTILS ---
         const Utils = {
             randomCode(inputId) {
-                const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // No I, 1, O, 0 to avoid confusion
+                const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; 
                 let result = "";
-                for(let i=0; i<5; i++) {
-                    result += chars.charAt(Math.floor(Math.random() * chars.length));
-                }
+                for(let i=0; i<5; i++) result += chars.charAt(Math.floor(Math.random() * chars.length));
                 document.getElementById(inputId).value = result;
             }
         };
 
-        // --- TIMER ---
+        // --- PROCEDURAL SOUND SYSTEM ---
+        const Sfx = {
+            ctx: null, enabled: true,
+            init() {
+                if(!this.ctx) {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    if(AudioContext) this.ctx = new AudioContext();
+                }
+                if(this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
+            },
+            toggle() {
+                this.enabled = !this.enabled;
+                const i = document.getElementById('icon-sound');
+                const t = document.getElementById('txt-sound');
+                if(this.enabled) { i.className="ph ph-speaker-high"; t.innerText="Sound On"; }
+                else { i.className="ph ph-speaker-slash"; t.innerText="Sound Off"; }
+                this.click();
+            },
+            playTone(freq, type, dur, vol=0.1, slide=0) {
+                if(!this.enabled || !this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = type;
+                osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+                if(slide !== 0) osc.frequency.linearRampToValueAtTime(freq + slide, this.ctx.currentTime + dur);
+                gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + dur);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + dur);
+            },
+            playNoise(dur, vol=0.1) {
+                if(!this.enabled || !this.ctx) return;
+                const bufSize = this.ctx.sampleRate * dur;
+                const buffer = this.ctx.createBuffer(1, bufSize, this.ctx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufSize; i++) data[i] = Math.random() * 2 - 1;
+                const noise = this.ctx.createBufferSource();
+                noise.buffer = buffer;
+                const filter = this.ctx.createBiquadFilter();
+                filter.type = 'lowpass';
+                filter.frequency.value = 800;
+                const gain = this.ctx.createGain();
+                gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + dur);
+                noise.connect(filter);
+                filter.connect(gain);
+                gain.connect(this.ctx.destination);
+                noise.start();
+            },
+            click() { this.playTone(800, 'triangle', 0.05, 0.05); },
+            bump() { this.playTone(100, 'square', 0.1, 0.1, -50); },
+            step() { this.playNoise(0.05, 0.03); },
+            win() {
+                if(!this.enabled) return;
+                [0, 150, 300, 450].forEach((d, i) => {
+                    setTimeout(() => this.playTone(440 + (i*110), 'triangle', 0.3, 0.1), d);
+                });
+            }
+        };
+
+        // --- PROCEDURAL TEXTURES ---
+        const TexGen = {
+            createWall() {
+                const s = 512;
+                const c = document.createElement('canvas'); c.width=s; c.height=s;
+                const ctx = c.getContext('2d');
+                ctx.fillStyle = '#1e293b'; ctx.fillRect(0,0,s,s);
+                ctx.fillStyle = '#334155'; const padding = 20; ctx.fillRect(padding, padding, s-padding*2, s-padding*2);
+                ctx.fillStyle = '#64748b'; const r = 4; const locs = [40, s-40];
+                locs.forEach(x => locs.forEach(y => { ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill(); }));
+                ctx.strokeStyle = '#0ea5e9'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(40, s/2); ctx.lineTo(s-40, s/2); ctx.stroke();
+                const tex = new THREE.CanvasTexture(c); tex.magFilter = THREE.NearestFilter; return tex;
+            },
+            createFloor() {
+                const s = 512;
+                const c = document.createElement('canvas'); c.width=s; c.height=s;
+                const ctx = c.getContext('2d');
+                ctx.fillStyle = '#020617'; ctx.fillRect(0,0,s,s);
+                ctx.strokeStyle = 'rgba(34, 211, 238, 0.2)'; ctx.lineWidth = 4;
+                ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(s,0); ctx.lineTo(s,s); ctx.stroke();
+                const tex = new THREE.CanvasTexture(c); tex.wrapS = THREE.RepeatWrapping; tex.wrapT = THREE.RepeatWrapping; return tex;
+            }
+        };
+
         const Timer = {
             el: null, elapsed: 0, lastTick: 0, interval: null, running: false,
             init() { this.el = document.getElementById('game-timer'); },
             start() {
-                this.running = true;
-                this.elapsed = 0;
-                this.lastTick = Date.now();
-                this.el.style.display = 'block';
-                this.update();
+                this.running = true; this.elapsed = 0; this.lastTick = Date.now();
+                this.el.style.display = 'block'; this.update();
                 this.interval = setInterval(() => this.update(), 100);
             },
-            stop() {
-                this.running = false;
-                clearInterval(this.interval);
-                return this.format(this.elapsed);
-            },
-            reset() {
-                this.running = false;
-                clearInterval(this.interval);
-                this.elapsed = 0;
-                this.el.style.display = 'none';
-                this.el.innerText = '00:00';
-            },
+            stop() { this.running = false; clearInterval(this.interval); return this.format(this.elapsed); },
+            reset() { this.running = false; clearInterval(this.interval); this.elapsed = 0; this.el.style.display = 'none'; this.el.innerText = '00:00'; },
             update() {
                 if(!this.running) return;
-                const now = Date.now();
-                const delta = now - this.lastTick;
-                this.lastTick = now;
-
-                // Time Dilation: 2D is faster based on movement speed ratio
-                // 3D is "normal" (1x). 2D is faster (approx 3x)
-                const multiplier = Game.mode3D ? 1 : (CONST.SPEED_2D / CONST.SPEED_3D);
-                
+                const now = Date.now(); const delta = now - this.lastTick; this.lastTick = now;
+                const multiplier = (!Game.is2D) ? 1 : (CONST.SPEED_2D / CONST.SPEED_3D);
                 this.elapsed += delta * multiplier;
                 this.el.innerText = this.format(this.elapsed);
             },
@@ -423,64 +461,26 @@
             }
         };
 
-        // --- PRNG (SEED SYSTEM) ---
         const Seed = {
-            rng: Math.random, // Default to built-in random
-            current: null,
-
-            // Hash string to 32-bit integer
-            hash(str) {
-                let h = 0x811c9dc5;
-                for (let i = 0; i < str.length; i++) {
-                    h ^= str.charCodeAt(i);
-                    h = Math.imul(h, 0x01000193);
-                }
-                return h >>> 0;
-            },
-
-            // Mulberry32 Algorithm
-            mulberry32(a) {
-                return function() {
-                    var t = a += 0x6D2B79F5;
-                    t = Math.imul(t ^ t >>> 15, t | 1);
-                    t ^= t + Math.imul(t ^ t >>> 7, t | 61);
-                    return ((t ^ t >>> 14) >>> 0) / 4294967296;
-                }
-            },
-
-            set(code) {
-                if(!code) { this.reset(); return; }
-                const seedInt = this.hash(code);
-                this.rng = this.mulberry32(seedInt);
-                this.current = code;
-            },
-
-            reset() {
-                this.rng = Math.random;
-                this.current = null;
-            }
+            rng: Math.random, current: null,
+            hash(str) { let h = 0x811c9dc5; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 0x01000193); } return h >>> 0; },
+            mulberry32(a) { return function() { var t = a += 0x6D2B79F5; t = Math.imul(t ^ t >>> 15, t | 1); t ^= t + Math.imul(t ^ t >>> 7, t | 61); return ((t ^ t >>> 14) >>> 0) / 4294967296; } },
+            set(code) { if(!code) { this.reset(); return; } const seedInt = this.hash(code); this.rng = this.mulberry32(seedInt); this.current = code; },
+            reset() { this.rng = Math.random; this.current = null; }
         };
 
-        // --- JOYSTICK ---
         class Joystick {
             constructor(zoneId, thumbId, maxDist = 40) {
-                this.zone = document.getElementById(zoneId);
-                this.thumb = document.getElementById(thumbId);
-                this.maxDist = maxDist;
-                this.active = false;
-                this.data = { x: 0, y: 0 }; 
-                this.origin = { x: 0, y: 0 };
+                this.zone = document.getElementById(zoneId); this.thumb = document.getElementById(thumbId);
+                this.maxDist = maxDist; this.active = false; this.data = { x: 0, y: 0 }; this.origin = { x: 0, y: 0 };
                 this.bindEvents();
             }
-
             bindEvents() {
                 const handleStart = (e) => {
-                    e.preventDefault();
-                    this.active = true;
+                    e.preventDefault(); this.active = true;
                     const rect = this.zone.getBoundingClientRect();
                     this.origin = { x: rect.left + rect.width/2, y: rect.top + rect.height/2 };
-                    this.update(e);
-                    this.zone.querySelector('.stick-base').style.borderColor = "rgba(34, 211, 238, 0.5)";
+                    this.update(e); this.zone.querySelector('.stick-base').style.borderColor = "rgba(34, 211, 238, 0.5)";
                 };
                 const handleMove = (e) => { if(!this.active) return; e.preventDefault(); this.update(e); };
                 const handleEnd = (e) => {
@@ -490,174 +490,104 @@
                 };
                 this.zone.addEventListener('touchstart', handleStart, {passive: false});
                 this.zone.addEventListener('touchmove', handleMove, {passive: false});
-                this.zone.addEventListener('touchend', handleEnd);
-                this.zone.addEventListener('touchcancel', handleEnd);
+                this.zone.addEventListener('touchend', handleEnd); this.zone.addEventListener('touchcancel', handleEnd);
             }
-
             update(e) {
                 const touch = e.targetTouches ? e.targetTouches[0] : e;
-                const dx = touch.clientX - this.origin.x;
-                const dy = touch.clientY - this.origin.y;
-                const dist = Math.sqrt(dx*dx + dy*dy);
-                const angle = Math.atan2(dy, dx);
+                const dx = touch.clientX - this.origin.x; const dy = touch.clientY - this.origin.y;
+                const dist = Math.sqrt(dx*dx + dy*dy); const angle = Math.atan2(dy, dx);
                 const clamped = Math.min(dist, this.maxDist);
-                const tx = Math.cos(angle) * clamped;
-                const ty = Math.sin(angle) * clamped;
+                const tx = Math.cos(angle) * clamped; const ty = Math.sin(angle) * clamped;
                 this.thumb.style.transform = `translate(calc(-50% + ${tx}px), calc(-50% + ${ty}px))`;
-                this.data.x = tx / this.maxDist;
-                this.data.y = ty / this.maxDist;
+                this.data.x = tx / this.maxDist; this.data.y = ty / this.maxDist;
             }
         }
 
-        // --- INPUT ---
         const Input = {
-            keys: { w:false, s:false, l:false, r:false },
-            stick: null,
-            initialized: false,
-            
+            keys: { w:false, s:false, l:false, r:false }, stick: null, initialized: false,
             init() {
-                if(this.initialized) return;
-                this.initialized = true;
-
+                if(this.initialized) return; this.initialized = true;
                 const k = (e,v) => {
                     const key = e.key.toLowerCase();
-                    if(key==='w'||key==='arrowup') this.keys.w=v;
-                    if(key==='s'||key==='arrowdown') this.keys.s=v;
-                    if(key==='a'||key==='arrowleft') this.keys.l=v;
-                    if(key==='d'||key==='arrowright') this.keys.r=v;
+                    if(key==='w'||key==='arrowup') this.keys.w=v; if(key==='s'||key==='arrowdown') this.keys.s=v;
+                    if(key==='a'||key==='arrowleft') this.keys.l=v; if(key==='d'||key==='arrowright') this.keys.r=v;
                 };
-                window.addEventListener('keydown', e=>k(e,true));
-                window.addEventListener('keyup', e=>k(e,false));
-
-                if('ontouchstart' in window || navigator.maxTouchPoints > 0) {
-                    this.stick = new Joystick('stick-zone', 'stick-thumb');
-                } else {
-                    document.getElementById('controls-hint').classList.remove('hidden');
-                }
+                window.addEventListener('keydown', e=>k(e,true)); window.addEventListener('keyup', e=>k(e,false));
+                if('ontouchstart' in window || navigator.maxTouchPoints > 0) { this.stick = new Joystick('stick-zone', 'stick-thumb'); } 
+                else { document.getElementById('controls-hint').classList.remove('hidden'); }
             },
-
-            get(mode3D) {
+            get(is3D) {
                 let dx = 0, dz = 0, rot = 0;
-
-                if (mode3D) {
-                    if(this.keys.w) dz = 1;
-                    if(this.keys.s) dz = -1;
-                    if(this.keys.l) rot = 1;
-                    if(this.keys.r) rot = -1;
+                if (is3D) {
+                    if(this.keys.w) dz = 1; if(this.keys.s) dz = -1;
+                    if(this.keys.l) rot = 1; if(this.keys.r) rot = -1;
                 } else {
-                    if(this.keys.w) dz = -1;
-                    if(this.keys.s) dz = 1;
-                    if(this.keys.l) dx = -1;
-                    if(this.keys.r) dx = 1;
+                    if(this.keys.w) dz = -1; if(this.keys.s) dz = 1;
+                    if(this.keys.l) dx = -1; if(this.keys.r) dx = 1;
                 }
-
                 if(this.stick && this.stick.active) {
-                    const sx = this.stick.data.x;
-                    const sy = this.stick.data.y;
-                    if(mode3D) { dz = -sy; rot = -sx; } 
-                    else { dx = sx; dz = sy; }
+                    const sx = this.stick.data.x; const sy = this.stick.data.y;
+                    if(is3D) { dz = -sy; rot = -sx; } else { dx = sx; dz = sy; }
                 }
                 return { dx, dz, rot };
             }
         };
 
-        // --- MAZE ---
         const MazeGen = {
             generate(w, h, rng = Math.random) {
                 let map = Array(h).fill().map(() => Array(w).fill(CONST.WALL));
-                
                 const stack = [];
-                // Random odd start point for the generation algorithm
-                const randOdd = (limit) => {
-                    const cols = Math.floor((limit - 1) / 2);
-                    return Math.floor(rng() * cols) * 2 + 1;
-                };
-                let genX = randOdd(w);
-                let genY = randOdd(h);
-
-                map[genY][genX] = CONST.PATH;
-                stack.push({x: genX, y: genY});
-
+                const randOdd = (limit) => Math.floor(rng() * Math.floor((limit - 1) / 2)) * 2 + 1;
+                let genX = randOdd(w); let genY = randOdd(h);
+                map[genY][genX] = CONST.PATH; stack.push({x: genX, y: genY});
                 const dirs = [{x:0, y:-2}, {x:0, y:2}, {x:-2, y:0}, {x:2, y:0}];
-                
-                // Generate Maze (DFS)
                 while(stack.length > 0) {
                     const current = stack[stack.length - 1];
                     const neighbors = [];
                     for(let d of dirs) {
-                        const nx = current.x + d.x;
-                        const ny = current.y + d.y;
+                        const nx = current.x + d.x; const ny = current.y + d.y;
                         if(nx > 0 && nx < w-1 && ny > 0 && ny < h-1 && map[ny][nx] === CONST.WALL) {
                             neighbors.push({x: nx, y: ny, dx: d.x/2, dy: d.y/2});
                         }
                     }
                     if(neighbors.length > 0) {
                         const next = neighbors[Math.floor(rng() * neighbors.length)];
-                        map[next.y][next.x] = CONST.PATH;
-                        map[current.y + next.dy][current.x + next.dx] = CONST.PATH;
+                        map[next.y][next.x] = CONST.PATH; map[current.y + next.dy][current.x + next.dx] = CONST.PATH;
                         stack.push({x: next.x, y: next.y});
                     } else { stack.pop(); }
                 }
-
-                // --- NEW LOGIC: Identify Dead Ends ---
                 const deadEnds = [];
                 for(let y = 1; y < h - 1; y++) {
                     for(let x = 1; x < w - 1; x++) {
                         if(map[y][x] === CONST.PATH) {
                             let neighbors = 0;
-                            if(map[y-1][x] !== CONST.WALL) neighbors++;
-                            if(map[y+1][x] !== CONST.WALL) neighbors++;
-                            if(map[y][x-1] !== CONST.WALL) neighbors++;
-                            if(map[y][x+1] !== CONST.WALL) neighbors++;
-                            
-                            // If only 1 neighbor (or it's an isolated root), it's a dead end/closed way
-                            if(neighbors === 1) {
-                                deadEnds.push({x, y});
-                            }
+                            if(map[y-1][x] !== CONST.WALL) neighbors++; if(map[y+1][x] !== CONST.WALL) neighbors++;
+                            if(map[y][x-1] !== CONST.WALL) neighbors++; if(map[y][x+1] !== CONST.WALL) neighbors++;
+                            if(neighbors === 1) deadEnds.push({x, y});
                         }
                     }
                 }
-
-                // Fallback if maze is weird
-                if(deadEnds.length < 2) {
-                     deadEnds.push({x: genX, y: genY});
-                }
-
-                // 1. Pick Start Point from Random Dead End
+                if(deadEnds.length < 2) deadEnds.push({x: genX, y: genY});
                 const startIndex = Math.floor(rng() * deadEnds.length);
                 const startNode = deadEnds[startIndex];
                 map[startNode.y][startNode.x] = CONST.START;
-
-                // 2. Pick End Point from a Distant Dead End
-                // Sort remaining dead ends by distance to startNode
                 const candidates = deadEnds.filter((_, i) => i !== startIndex).map(d => {
-                    return {
-                        node: d,
-                        dist: Math.abs(d.x - startNode.x) + Math.abs(d.y - startNode.y) // Manhattan
-                    };
+                    return { node: d, dist: Math.abs(d.x - startNode.x) + Math.abs(d.y - startNode.y) };
                 });
-                
-                // Sort descending distance
                 candidates.sort((a, b) => b.dist - a.dist);
-                
-                // Pick randomly from the top 20% furthest candidates to ensure complexity but variety
                 const topCount = Math.max(1, Math.min(5, Math.floor(candidates.length * 0.2)));
                 const chosenCandidate = candidates[Math.floor(rng() * topCount)] || candidates[0];
-                
                 const bestEnd = chosenCandidate ? chosenCandidate.node : deadEnds[(startIndex + 1) % deadEnds.length];
-
                 map[bestEnd.y][bestEnd.x] = CONST.END;
-                
                 return map;
             }
         };
 
-        // --- GRAPHICS ---
         const GFX = {
             scene: null, camera: null, renderer: null, wallsMesh: null,
+            wallTex: null, floorTex: null, playerMesh: null,
             init() {
                 if(this.renderer) return;
-
                 const cvs = document.getElementById('c3d');
                 this.renderer = new THREE.WebGLRenderer({ canvas: cvs, antialias: false });
                 this.renderer.setSize(window.innerWidth, window.innerHeight);
@@ -665,35 +595,61 @@
                 this.scene.background = new THREE.Color(0x020617);
                 this.scene.fog = new THREE.Fog(0x020617, 2, 20);
                 this.camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.1, 100);
-                this.scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+                this.scene.add(new THREE.AmbientLight(0xffffff, 0.4));
                 this.pl = new THREE.PointLight(0x38bdf8, 1.5, 12);
                 this.scene.add(this.pl);
+                
+                // Textures
+                this.wallTex = TexGen.createWall();
+                this.floorTex = TexGen.createFloor();
+
                 window.addEventListener('resize', () => {
                     this.camera.aspect = window.innerWidth / window.innerHeight;
                     this.camera.updateProjectionMatrix();
                     this.renderer.setSize(window.innerWidth, window.innerHeight);
                 });
             },
+            createPlayer() {
+                const group = new THREE.Group();
+                // Body
+                const bodyGeo = new THREE.BoxGeometry(1, 1.8, 1);
+                const bodyMat = new THREE.MeshLambertMaterial({ color: 0x22d3ee });
+                const body = new THREE.Mesh(bodyGeo, bodyMat);
+                body.position.y = 0.9;
+                group.add(body);
+                // Visor
+                const visorGeo = new THREE.BoxGeometry(0.8, 0.4, 0.2);
+                const visorMat = new THREE.MeshLambertMaterial({ color: 0x000000 });
+                const visor = new THREE.Mesh(visorGeo, visorMat);
+                visor.position.set(0, 1.4, -0.5); // Facing Negative Z
+                group.add(visor);
+                
+                return group;
+            },
             build(map, w, h) {
                 if (!this.scene) this.init();
-
                 for(let i = this.scene.children.length - 1; i >= 0; i--) {
                      const c = this.scene.children[i];
-                     if(!c.isLight && !c.isCamera) {
-                         this.scene.remove(c);
-                         if(c.geometry) c.geometry.dispose();
-                     }
+                     if(!c.isLight && !c.isCamera) { this.scene.remove(c); if(c.geometry) c.geometry.dispose(); }
                 }
-                this.wallsMesh = null;
                 
-                const floor = new THREE.Mesh(new THREE.PlaneGeometry(w*4, h*4), new THREE.MeshBasicMaterial({ color: 0x0f172a }));
+                // Player Mesh
+                this.playerMesh = this.createPlayer();
+                this.scene.add(this.playerMesh);
+
+                // Floor (moved from y=-2 to y=0)
+                const floorGeo = new THREE.PlaneGeometry(w*4, h*4);
+                this.floorTex.repeat.set(w/2, h/2);
+                const floorMat = new THREE.MeshLambertMaterial({ map: this.floorTex });
+                const floor = new THREE.Mesh(floorGeo, floorMat);
                 floor.rotation.x = -Math.PI/2;
-                floor.position.set(w*2, -2, h*2); 
+                floor.position.set(w*2, 0, h*2); // CHANGED: Floor is now at Y=0
                 this.scene.add(floor);
 
+                // Walls
                 const wallCount = map.flat().filter(c => c === CONST.WALL).length;
                 const geo = new THREE.BoxGeometry(4, 4, 4);
-                const mat = new THREE.MeshLambertMaterial({ color: 0x475569 });
+                const mat = new THREE.MeshLambertMaterial({ map: this.wallTex });
                 this.wallsMesh = new THREE.InstancedMesh(geo, mat, wallCount);
                 
                 const dummy = new THREE.Object3D();
@@ -701,73 +657,101 @@
                 for(let z=0; z<h; z++) {
                     for(let x=0; x<w; x++) {
                         const t = map[z][x];
-                        const worldX = x * 4 + 2;
-                        const worldZ = z * 4 + 2;
-
+                        const worldX = x * 4 + 2; const worldZ = z * 4 + 2;
                         if(t === CONST.WALL) {
-                            dummy.position.set(worldX, 0, worldZ);
+                            dummy.position.set(worldX, 2, worldZ); // CHANGED: Walls centered at Y=2 to sit on floor (0-4 range)
                             dummy.updateMatrix();
                             this.wallsMesh.setMatrixAt(idx++, dummy.matrix);
                         } else if(t === CONST.END) {
                             const orb = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 16), new THREE.MeshBasicMaterial({ color: 0xef4444 }));
-                            orb.position.set(worldX, 0, worldZ);
+                            orb.position.set(worldX, 2, worldZ); // CHANGED: Orb centered at Y=2
                             this.scene.add(orb);
                             const pl = new THREE.PointLight(0xff0000, 2, 8);
-                            pl.position.set(worldX, 0, worldZ);
+                            pl.position.set(worldX, 2, worldZ); // CHANGED: Light centered at Y=2
                             this.scene.add(pl);
                         }
                     }
                 }
                 this.scene.add(this.wallsMesh);
             },
-            render(player) {
-                this.camera.position.set(player.x*4, 0, player.z*4);
-                const tx = this.camera.position.x - Math.sin(player.dir);
-                const tz = this.camera.position.z - Math.cos(player.dir);
-                this.camera.lookAt(tx, 0, tz);
-                this.pl.position.copy(this.camera.position);
-                this.renderer.render(this.scene, this.camera);
+            snapCamera: true, // Flag to reset lerp
+            render(player, is2D, isThirdPerson) {
+                // Update Player Mesh Position
+                const px = player.x * 4;
+                const pz = player.z * 4;
+                
+                if (this.playerMesh) {
+                    this.playerMesh.position.set(px, 0, pz); // Player feet at Y=0 (on floor)
+                    this.playerMesh.rotation.y = player.dir + Math.PI; // Correct rotation for model facing
+                    this.playerMesh.visible = isThirdPerson;
+                }
+
+                // Camera Logic
+                if (!is2D) {
+                    if (isThirdPerson) {
+                        // Smooth Third Person Camera
+                        const dist = 10;
+                        const height = 10; // Slightly higher to account for new wall height
+                        // Calculate target position based on player direction (behind the player)
+                        // Player moves in -sin, -cos direction. So behind is +sin, +cos
+                        const targetX = px + Math.sin(player.dir) * dist;
+                        const targetZ = pz + Math.cos(player.dir) * dist;
+                        
+                        if (this.snapCamera) {
+                            this.camera.position.set(targetX, height, targetZ);
+                            this.snapCamera = false;
+                        } else {
+                            // Lerp for smoothness
+                            const idealPos = new THREE.Vector3(targetX, height, targetZ);
+                            this.camera.position.lerp(idealPos, 0.1);
+                        }
+                        this.camera.lookAt(px, 1, pz); // Look at player center (Y=1 approx)
+                    } else {
+                        // First Person (Snappy)
+                        this.camera.position.set(px, 1.6, pz); // CHANGED: Eye level at 1.6m above floor
+                        const tx = px - Math.sin(player.dir);
+                        const tz = pz - Math.cos(player.dir);
+                        this.camera.lookAt(tx, 1.6, tz);
+                        this.snapCamera = true; // Reset snap for when we switch back to 3rd
+                    }
+                    
+                    // Light follows player (but offset slightly above walls)
+                    this.pl.position.set(px, 5, pz); // CHANGED: Above walls
+                    this.renderer.render(this.scene, this.camera);
+                }
             },
             render2D(map, w, h, p, cvsId) {
                 const cvs = document.getElementById(cvsId);
                 const ctx = cvs.getContext('2d');
                 const isMini = cvsId === 'minimap';
-
                 if(!isMini) {
                     if(cvs.width !== window.innerWidth) { cvs.width=window.innerWidth; cvs.height=window.innerHeight; }
                     ctx.fillStyle = '#020617'; ctx.fillRect(0,0,cvs.width,cvs.height);
                 } else {
-                    // Update minimap size to match CSS (180x180)
-                    cvs.width=180; cvs.height=180;
-                    ctx.fillStyle = "rgba(15, 23, 42, 0.95)"; ctx.fillRect(0,0,180,180);
+                    // Update canvas size to match visual size (sharpness)
+                    const wrapper = document.getElementById('minimap-wrapper');
+                    if(cvs.width !== wrapper.clientWidth || cvs.height !== wrapper.clientHeight) {
+                        cvs.width = wrapper.clientWidth;
+                        cvs.height = wrapper.clientHeight;
+                    }
+                    ctx.fillStyle = "rgba(15, 23, 42, 0.95)"; ctx.fillRect(0,0,cvs.width,cvs.height);
                 }
-
                 const pad = isMini ? 0 : 40;
                 const sw = cvs.width-pad; const sh = cvs.height-pad;
                 const scale = Math.min(sw/w, sh/h);
                 const ox = (cvs.width - w*scale)/2;
                 const oy = (cvs.height - h*scale)/2;
-
                 for(let z=0; z<h; z++) for(let x=0; x<w; x++) {
                     const t = map[z][x];
                     if(isMini && t!==CONST.WALL && t!==CONST.END) continue;
                     this.drawCell(ctx, t, ox+x*scale, oy+z*scale, scale);
                 }
-
-                const px = ox + p.x*scale;
-                const py = oy + p.z*scale;
+                const px = ox + p.x*scale; const py = oy + p.z*scale;
                 ctx.save();
                 ctx.translate(px, py);
-                if(isMini) ctx.rotate(-p.dir); 
-                else ctx.rotate(p.dir); 
-                
+                if(isMini) ctx.rotate(-p.dir); else ctx.rotate(p.dir); 
                 ctx.fillStyle = '#fbbf24';
-                ctx.beginPath();
-                ctx.moveTo(0, -scale*0.7);
-                ctx.lineTo(scale*0.4, scale*0.5);
-                ctx.lineTo(0, scale*0.3);
-                ctx.lineTo(-scale*0.4, scale*0.5);
-                ctx.fill();
+                ctx.beginPath(); ctx.moveTo(0, -scale*0.7); ctx.lineTo(scale*0.4, scale*0.5); ctx.lineTo(0, scale*0.3); ctx.lineTo(-scale*0.4, scale*0.5); ctx.fill();
                 ctx.restore();
             },
             drawCell(ctx, t, x, y, s) {
@@ -780,92 +764,113 @@
             }
         };
 
-        // --- GAME ---
         const Game = {
-            running: false, mode3D: true,
+            running: false, is2D: false, isThirdPerson: false, 
             map: [], w: 0, h: 0,
             player: { x:1, z:1, dir: Math.PI },
+            stepTimer: 0,
 
             init() {
                 Input.init(); GFX.init(); Timer.init(); this.loop();
-                document.getElementById('inp-code').addEventListener('keyup', (e)=>{
-                    if(e.key === 'Enter') this.start('code');
-                });
+                document.querySelectorAll('button').forEach(b => b.addEventListener('click', () => Sfx.click()));
+                document.getElementById('inp-code').addEventListener('keyup', (e)=>{ if(e.key === 'Enter') this.start('code'); });
             },
             start(mode) {
+                Sfx.init(); // Initialize audio context on interaction
                 if (!GFX.scene) this.init(); 
-
-                let w=15, h=15;
-                let rng = Math.random;
-
-                // Reset timer for new game
+                let w=15, h=15; let rng = Math.random;
                 Timer.reset();
-
                 if (mode === 'code') {
-                    // SEED LOGIC
                     const rawCode = document.getElementById('inp-code').value.trim();
                     const sizeVal = parseInt(document.getElementById('inp-size').value);
                     if(!rawCode) return alert("Please enter a code!");
                     const code = rawCode.toUpperCase();
-                    Seed.set(code);
-                    rng = Seed.rng;
-                    w = sizeVal; h = sizeVal;
-                    
+                    Seed.set(code); rng = Seed.rng; w = sizeVal; h = sizeVal;
                     document.getElementById('ui-code-display').classList.remove('hidden');
                     document.getElementById('ui-code-val').innerText = `${code} (${w}x${h})`;
                 } else {
-                    // REGULAR LOGIC
                     Seed.reset();
                     document.getElementById('ui-code-display').classList.add('hidden');
-                    
-                    if(mode==='easy'){w=11;h=11;} 
-                    if(mode==='medium'){w=25;h=25;} 
-                    if(mode==='hard'){w=51;h=51;}
+                    if(mode==='easy'){w=11;h=11;} if(mode==='medium'){w=25;h=25;} if(mode==='hard'){w=51;h=51;}
                 }
-
-                if(mode==='custom') { 
-                    this.map=JSON.parse(JSON.stringify(Editor.grid)); 
-                    this.w=this.map[0].length; this.h=this.map.length; 
-                } else { 
-                    this.map = MazeGen.generate(w, h, rng); 
-                    this.w=w; this.h=h; 
-                }
-
+                if(mode==='custom') { this.map=JSON.parse(JSON.stringify(Editor.grid)); this.w=this.map[0].length; this.h=this.map.length; } 
+                else { this.map = MazeGen.generate(w, h, rng); this.w=w; this.h=h; }
                 let found=false;
                 for(let z=0;z<this.h;z++) for(let x=0;x<this.w;x++) if(this.map[z][x]===CONST.START) { this.player.x=x+0.5; this.player.z=z+0.5; found=true; }
                 if(!found){this.player.x=1.5;this.player.z=1.5;}
                 this.player.dir = Math.PI;
-
                 GFX.build(this.map, this.w, this.h);
                 document.querySelectorAll('.ui-screen').forEach(e => e.classList.add('hidden'));
                 document.getElementById('screen-game').classList.remove('hidden');
                 document.getElementById('screen-game').classList.add('flex');
                 
-                this.mode3D=true; this.running=true;
-                Timer.start(); // Start timing!
+                // Defaults
+                this.is2D = false;
+                this.isThirdPerson = false;
+                GFX.snapCamera = true;
+                
+                this.running=true;
+                Timer.start(); this.updateUI();
+            },
+            toggleDimension() { 
+                this.is2D = !this.is2D;
+                if (!this.is2D) GFX.snapCamera = true;
+                this.updateUI(); 
+            },
+            toggleCamera() {
+                if(this.is2D) return;
+                this.isThirdPerson = !this.isThirdPerson;
+                GFX.snapCamera = true;
                 this.updateUI();
             },
-            toggleView() { this.mode3D=!this.mode3D; this.updateUI(); },
             updateUI() {
                 const isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-                document.getElementById('c3d').style.display = this.mode3D ? 'block' : 'none';
-                document.getElementById('c2d').style.display = this.mode3D ? 'none' : 'block';
-                document.getElementById('minimap-wrapper').style.display = this.mode3D ? 'block' : 'none';
-                document.getElementById('lbl-view').innerText = this.mode3D ? "2D Map" : "3D View";
+                
+                document.getElementById('c3d').style.display = !this.is2D ? 'block' : 'none';
+                document.getElementById('c2d').style.display = this.is2D ? 'block' : 'none';
+                document.getElementById('minimap-wrapper').style.display = !this.is2D ? 'block' : 'none';
+                
+                // Dimension Button
+                const dimIcon = this.is2D ? 'ph-cube' : 'ph-map-trifold';
+                const dimText = this.is2D ? '3D View' : '2D Map';
+                document.getElementById('icon-dim').className = `ph ${dimIcon} text-lg`;
+                document.getElementById('lbl-dim').innerText = dimText;
+
+                // POV Button (Disabled visually in 2D)
+                const povBtn = document.getElementById('btn-pov');
+                if (this.is2D) {
+                    povBtn.classList.add('opacity-50', 'grayscale');
+                    povBtn.classList.remove('active:scale-95');
+                } else {
+                    povBtn.classList.remove('opacity-50', 'grayscale');
+                    povBtn.classList.add('active:scale-95');
+                }
+                const povIcon = this.isThirdPerson ? 'ph-eye' : 'ph-person';
+                const povText = this.isThirdPerson ? '1st Person' : '3rd Person';
+                document.getElementById('icon-pov').className = `ph ${povIcon} text-lg`;
+                document.getElementById('lbl-pov').innerText = povText;
+                
                 document.getElementById('controls-ui').style.display = isMobile ? 'block' : 'none';
             },
             loop() {
                 requestAnimationFrame(()=>this.loop());
                 if(!this.running) return;
-
-                const input = Input.get(this.mode3D);
-                if(this.mode3D) {
+                
+                const input = Input.get(!this.is2D);
+                
+                if(!this.is2D) {
                     this.player.dir += input.rot * CONST.ROT_SPEED;
                     if(Math.abs(input.dz) > 0.05) {
                         const speed = input.dz * CONST.SPEED_3D;
                         const dx = -Math.sin(this.player.dir) * speed;
                         const dz = -Math.cos(this.player.dir) * speed;
                         this.move(dx, dz);
+                        
+                        // Step Sound
+                        if(Date.now() - this.stepTimer > 400) {
+                            Sfx.step();
+                            this.stepTimer = Date.now();
+                        }
                     }
                 } else {
                     if(Math.abs(input.dx)>0.05 || Math.abs(input.dz)>0.05) {
@@ -875,24 +880,27 @@
                         if(dx!==0 || dz!==0) this.player.dir = Math.atan2(dx, -dz);
                     }
                 }
-
                 const gx=Math.floor(this.player.x), gz=Math.floor(this.player.z);
                 if(this.map[gz][gx]===CONST.END) {
                     this.running=false;
-                    const finalTime = Timer.stop(); // Stop timing
+                    const finalTime = Timer.stop();
                     document.getElementById('victory-time').innerText = finalTime;
                     document.getElementById('screen-victory').classList.remove('hidden');
                     document.getElementById('screen-victory').classList.add('flex');
                     document.getElementById('minimap-wrapper').style.display='none';
                     document.getElementById('controls-ui').style.display='none';
+                    Sfx.win();
                 }
-
-                if(this.mode3D) { GFX.render(this.player); GFX.render2D(this.map, this.w, this.h, this.player, 'minimap'); }
-                else GFX.render2D(this.map, this.w, this.h, this.player, 'c2d');
+                if(!this.is2D) { 
+                    GFX.render(this.player, this.is2D, this.isThirdPerson); 
+                    GFX.render2D(this.map, this.w, this.h, this.player, 'minimap'); 
+                } else {
+                    GFX.render2D(this.map, this.w, this.h, this.player, 'c2d');
+                }
             },
             move(dx, dz) {
-                if(!this.col(this.player.x+dx, this.player.z)) this.player.x+=dx;
-                if(!this.col(this.player.x, this.player.z+dz)) this.player.z+=dz;
+                if(!this.col(this.player.x+dx, this.player.z)) { this.player.x+=dx; }
+                if(!this.col(this.player.x, this.player.z+dz)) { this.player.z+=dz; }
             },
             col(x, z) {
                 const r = CONST.COLLISION_RADIUS;
@@ -904,8 +912,7 @@
                 return false;
             },
             quit() {
-                this.running=false;
-                Timer.reset();
+                this.running=false; Timer.reset();
                 document.querySelectorAll('.ui-screen').forEach(e => e.classList.add('hidden'));
                 document.getElementById('screen-menu').classList.remove('hidden');
                 document.getElementById('minimap-wrapper').style.display='none';
@@ -913,19 +920,14 @@
             }
         };
 
-        // --- EDITOR ---
         const Editor = {
             grid: [], size: 10, tool: 1, isDrawing: false, zoom: 1.0, mode: 'draw',
-            
             open() {
-                // Initial grid if not exists
                 if(this.grid.length === 0) this.resize(this.size);
-
                 document.getElementById('screen-menu').classList.add('hidden');
                 document.getElementById('screen-editor').classList.remove('hidden');
                 document.getElementById('screen-editor').classList.add('flex');
                 setTimeout(()=>this.render(), 10);
-
                 const vp = document.getElementById('editor-grid');
                 const handleStart = (e) => {
                     if(this.mode === 'pan') return; 
@@ -938,9 +940,7 @@
                     e.preventDefault();
                     if(this.isDrawing) this.handleInput(e);
                 };
-                vp.onpointerdown = handleStart;
-                vp.onpointermove = handleMove;
-                vp.onpointerup = () => this.isDrawing = false;
+                vp.onpointerdown = handleStart; vp.onpointermove = handleMove; vp.onpointerup = () => this.isDrawing = false;
             },
             close() {
                 document.getElementById('screen-editor').classList.add('hidden');
@@ -950,13 +950,11 @@
                 const code = document.getElementById('ed-code').value.trim();
                 const size = parseInt(document.getElementById('ed-size').value);
                 if(!code) return alert("Please enter a code");
-                
                 Seed.set(code.toUpperCase());
                 this.grid = MazeGen.generate(size, size, Seed.rng);
                 this.size = size;
                 document.getElementById('lbl-size').innerText = `${this.size}x`;
-                Seed.reset(); // Reset global seed so normal games aren't affected unless specified
-                this.render();
+                Seed.reset(); this.render();
             },
             setTool(t) { this.tool = t; this.updateUI(); },
             setMode(m) { 
@@ -967,7 +965,6 @@
             updateUI() {
                 document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('border-cyan-400', 'bg-slate-600'));
                 document.getElementById('t-'+this.tool).classList.add('border-cyan-400', 'bg-slate-600');
-                
                 document.getElementById('btn-mode-draw').className = `flex-1 rounded transition flex justify-center items-center text-xs font-bold ${this.mode==='draw'?'bg-cyan-700 text-white':'text-slate-400 hover:text-white'}`;
                 document.getElementById('btn-mode-pan').className = `flex-1 rounded transition flex justify-center items-center text-xs font-bold ${this.mode==='pan'?'bg-cyan-700 text-white':'text-slate-400 hover:text-white'}`;
             },
@@ -1000,16 +997,13 @@
                 const el = document.getElementById('editor-grid');
                 const viewport = document.getElementById('editor-viewport');
                 el.innerHTML = '';
-                
                 const pad = 32; 
                 const availW = viewport.clientWidth - pad;
                 const availH = viewport.clientHeight - pad;
                 const baseSize = Math.floor(Math.min(availW, availH) / this.size);
                 const cellSize = Math.floor(baseSize * this.zoom);
-
                 el.style.gridTemplateColumns = `repeat(${this.size}, ${cellSize}px)`;
                 el.style.width = 'fit-content'; 
-                
                 const frag = document.createDocumentFragment();
                 for(let y=0; y<this.size; y++) for(let x=0; x<this.size; x++) {
                     const d = document.createElement('div');
