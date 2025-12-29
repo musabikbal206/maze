@@ -32,7 +32,7 @@
 
         /* Minimap */
         #minimap-wrapper {
-            width: 240px; height: 240px; /* Increased size */
+            width: 240px; height: 240px; 
             background: rgba(15, 23, 42, 0.9);
             border: 2px solid rgba(255,255,255,0.1);
             border-radius: 12px;
@@ -100,7 +100,14 @@
 
         #editor-viewport { overflow: auto; touch-action: pan-x pan-y; cursor: grab; }
         #editor-viewport.mode-draw { touch-action: none; cursor: crosshair; }
-        #editor-grid { display: grid; box-shadow: 0 0 50px rgba(0,0,0,0.5); margin: auto; transform-origin: top left; }
+        #editor-grid { display: grid; box-shadow: 0 20px 50px rgba(0,0,0,0.8); margin: auto; transform-origin: center; }
+        
+        /* Technical Background Pattern for Editor */
+        .bg-grid-pattern {
+            background-color: #020617;
+            background-image: radial-gradient(rgba(51, 65, 85, 0.4) 1px, transparent 1px);
+            background-size: 24px 24px;
+        }
 
         @keyframes glow {
             0% { box-shadow: 0 0 5px rgba(34, 211, 238, 0.2); }
@@ -116,6 +123,23 @@
             .btn-game-ui { padding: 8px 12px; }
             #ui-code-display { font-size: 0.65rem; padding: 4px 8px; }
         }
+        
+        /* Keyboard Badge */
+        .key-badge {
+            background: rgba(255,255,255,0.1);
+            padding: 0px 6px;
+            border-radius: 4px;
+            font-size: 0.7em;
+            margin-left: 6px;
+            border: 1px solid rgba(255,255,255,0.2);
+            color: #94a3b8;
+        }
+        
+        /* Custom Scrollbar for editor panel */
+        .custom-scroll::-webkit-scrollbar { width: 6px; }
+        .custom-scroll::-webkit-scrollbar-track { background: #0f172a; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+        .custom-scroll::-webkit-scrollbar-thumb:hover { background: #475569; }
     </style>
 </head>
 <body>
@@ -143,8 +167,10 @@
 
     <!-- Desktop Hint -->
     <div id="controls-hint" class="ui-screen hidden md:flex justify-end items-end p-8 z-10 pointer-events-none">
-        <div class="bg-slate-900/80 backdrop-blur p-4 rounded-xl border border-white/10 text-slate-400 text-sm font-mono">
+        <div class="bg-slate-900/80 backdrop-blur p-4 rounded-xl border border-white/10 text-slate-400 text-sm font-mono flex flex-col gap-2">
             <div class="flex items-center gap-4"><span class="bg-slate-700 px-2 rounded text-white">WASD</span> <span>Move</span></div>
+            <div class="flex items-center gap-4"><span class="bg-slate-700 px-2 rounded text-white">M</span> <span>Map</span></div>
+            <div class="flex items-center gap-4"><span class="bg-slate-700 px-2 rounded text-white">V</span> <span>View</span></div>
         </div>
     </div>
 
@@ -218,11 +244,11 @@
                 <div class="flex gap-2">
                     <!-- 2D/3D Toggle -->
                     <button onclick="Game.toggleDimension()" class="bg-slate-900/80 backdrop-blur text-cyan-400 border border-cyan-900/50 px-3 py-2 rounded-lg font-bold shadow-lg flex items-center gap-2 text-sm transition active:scale-95 btn-game-ui">
-                        <i id="icon-dim" class="ph ph-cube text-lg"></i> <span id="lbl-dim">3D View</span>
+                        <i id="icon-dim" class="ph ph-cube text-lg"></i> <span id="lbl-dim">3D View</span> <span class="key-badge hidden md:inline">M</span>
                     </button>
                     <!-- POV Toggle (1st/3rd) -->
                     <button id="btn-pov" onclick="Game.toggleCamera()" class="bg-slate-900/80 backdrop-blur text-emerald-400 border border-emerald-900/50 px-3 py-2 rounded-lg font-bold shadow-lg flex items-center gap-2 text-sm transition active:scale-95 btn-game-ui">
-                        <i id="icon-pov" class="ph ph-person text-lg"></i> <span id="lbl-pov">3rd Person</span>
+                        <i id="icon-pov" class="ph ph-person text-lg"></i> <span id="lbl-pov">3rd Person</span> <span class="key-badge hidden md:inline">V</span>
                     </button>
                 </div>
 
@@ -233,84 +259,119 @@
         </div>
     </div>
 
-    <!-- Editor UI -->
-    <div id="screen-editor" class="ui-screen hidden bg-slate-900 z-50 flex-col interactive">
-        <div class="h-14 bg-slate-800 border-b border-slate-700 flex items-center justify-between px-4 shrink-0 shadow-md">
-            <h2 class="font-bold text-cyan-400 flex items-center gap-2"><i class="ph ph-grid-nine"></i> Editor</h2>
-            <div class="flex gap-2">
-                <button onclick="Editor.close()" class="px-3 py-1 text-slate-400 hover:text-white text-sm">Back</button>
-                <button onclick="Game.start('custom')" class="bg-green-600 hover:bg-green-500 text-white px-4 py-1 rounded font-bold shadow-md flex items-center gap-2 text-sm">
-                    <i class="ph ph-play"></i> Play
+    <!-- Editor UI - DESKTOP REDESIGN -->
+    <div id="screen-editor" class="ui-screen hidden bg-slate-950 z-50 flex-col interactive font-sans">
+        <!-- Header -->
+        <div class="h-16 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-4 md:px-6 shrink-0 shadow-lg z-20">
+            <div class="flex items-center gap-3">
+                <div class="w-8 h-8 bg-cyan-600 rounded-lg flex items-center justify-center text-white shadow-cyan-500/20 shadow-lg hidden md:flex">
+                    <i class="ph ph-pencil-simple-line text-xl"></i>
+                </div>
+                <div>
+                    <h2 class="font-bold text-slate-100 text-lg leading-tight flex items-center gap-2"><i class="ph ph-pencil-simple-line md:hidden text-cyan-400"></i> Map Editor</h2>
+                    <p class="text-xs text-slate-500 font-mono hidden md:block">DESIGN MODE</p>
+                </div>
+            </div>
+            <div class="flex gap-3">
+                <button onclick="Editor.close()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white px-4 py-2 rounded-lg font-bold text-sm transition border border-slate-700">
+                    Exit
+                </button>
+                <button onclick="Game.start('custom')" class="bg-green-600 hover:bg-green-500 text-white px-5 py-2 rounded-lg font-bold shadow-lg flex items-center gap-2 text-sm transition transform active:scale-95">
+                    <i class="ph ph-play-circle text-lg"></i> Play
                 </button>
             </div>
         </div>
 
-        <div class="flex flex-1 overflow-hidden flex-col-reverse md:flex-row">
-            <div class="w-full md:w-56 h-auto md:h-full bg-slate-800 border-t md:border-t-0 md:border-r border-slate-700 flex flex-row md:flex-col flex-wrap gap-2 p-2 shrink-0 overflow-y-auto content-start">
-                <div class="flex gap-2 w-full md:w-full items-stretch h-10 md:h-auto">
-                    <div class="flex bg-slate-900 rounded p-1 w-[30%] md:w-full shrink-0">
-                        <button onclick="Editor.setMode('draw')" id="btn-mode-draw" class="flex-1 rounded text-slate-400 hover:text-white transition flex justify-center items-center text-xs font-bold bg-cyan-700 text-white">
-                            <i class="ph ph-pencil-simple text-lg md:text-base"></i> <span class="hidden md:inline ml-2">DRAW</span>
-                        </button>
-                        <button onclick="Editor.setMode('pan')" id="btn-mode-pan" class="flex-1 rounded text-slate-400 hover:text-white transition flex justify-center items-center text-xs font-bold">
-                            <i class="ph ph-hand-grabbing text-lg md:text-base"></i> <span class="hidden md:inline ml-2">PAN</span>
-                        </button>
+        <div class="flex flex-1 overflow-hidden flex-col-reverse md:flex-row relative">
+            
+            <!-- Sidebar (Desktop: Left, Mobile: Bottom) -->
+            <div class="w-full md:w-72 bg-slate-900 border-r border-slate-800 flex flex-col z-10 shadow-xl overflow-y-auto custom-scroll shrink-0">
+                <div class="p-4 space-y-6">
+                    
+                    <!-- Tools Section -->
+                    <div class="space-y-2">
+                        <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wider">Mode</h3>
+                        <div class="flex bg-slate-950 p-1 rounded-lg border border-slate-800">
+                            <button onclick="Editor.setMode('draw')" id="btn-mode-draw" class="flex-1 py-2 rounded-md transition flex justify-center items-center text-xs font-bold gap-2">
+                                <i class="ph ph-pencil-simple text-lg"></i> DRAW
+                            </button>
+                            <button onclick="Editor.setMode('pan')" id="btn-mode-pan" class="flex-1 py-2 rounded-md transition flex justify-center items-center text-xs font-bold gap-2">
+                                <i class="ph ph-hand-grabbing text-lg"></i> PAN
+                            </button>
+                        </div>
                     </div>
-                    <div class="flex gap-1 flex-1 md:w-full md:grid md:grid-cols-1">
-                         <button onclick="Editor.setTool(1)" id="t-1" class="tool-btn flex-1 bg-slate-700 rounded flex flex-col md:flex-row items-center justify-center gap-2 border border-transparent text-slate-300 text-[10px] md:text-sm transition">
-                            <div class="w-4 h-4 md:w-6 md:h-6 bg-slate-500 border border-slate-400"></div> <span class="hidden md:inline">Wall</span>
-                        </button>
-                        <button onclick="Editor.setTool(0)" id="t-0" class="tool-btn flex-1 bg-slate-700 rounded flex flex-col md:flex-row items-center justify-center gap-2 border border-transparent text-slate-300 text-[10px] md:text-sm transition">
-                            <div class="w-4 h-4 md:w-6 md:h-6 bg-slate-900 border border-slate-600"></div> <span class="hidden md:inline">Path</span>
-                        </button>
-                        <button onclick="Editor.setTool(2)" id="t-2" class="tool-btn flex-1 bg-slate-700 rounded flex flex-col md:flex-row items-center justify-center gap-2 border border-transparent text-slate-300 text-[10px] md:text-sm transition">
-                            <div class="w-4 h-4 md:w-6 md:h-6 bg-emerald-500 rounded-full"></div> <span class="hidden md:inline">Start</span>
-                        </button>
-                        <button onclick="Editor.setTool(3)" id="t-3" class="tool-btn flex-1 bg-slate-700 rounded flex flex-col md:flex-row items-center justify-center gap-2 border border-transparent text-slate-300 text-[10px] md:text-sm transition">
-                            <div class="w-4 h-4 md:w-6 md:h-6 bg-red-500 rounded-full shadow-[0_0_5px_red]"></div> <span class="hidden md:inline">End</span>
-                        </button>
-                    </div>
-                </div>
 
-                <div class="h-px bg-slate-700 my-1 w-full hidden md:block"></div>
-                <div class="flex gap-2 w-full">
-                     <div class="w-1/2 md:w-full px-1">
-                        <div class="flex justify-between text-[10px] text-slate-500 font-bold mb-1">
-                            <span>SIZE</span> <span id="lbl-size">10x</span>
-                        </div>
-                        <input type="range" min="10" max="50" step="5" value="10" onchange="Editor.resize(this.value)" class="w-full accent-cyan-500 h-2 bg-slate-900 rounded-lg appearance-none cursor-pointer">
+                    <!-- Brushes Section -->
+                    <div class="space-y-2">
+                         <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wider">Brushes</h3>
+                         <div class="grid grid-cols-2 gap-2">
+                             <button onclick="Editor.setTool(1)" id="t-1" class="tool-btn h-20 bg-slate-800 hover:bg-slate-700 rounded-lg border-2 border-transparent transition flex flex-col items-center justify-center gap-2 group">
+                                <div class="w-8 h-8 bg-slate-500 border border-slate-400 rounded group-hover:scale-110 transition"></div>
+                                <span class="text-xs font-bold text-slate-400 group-hover:text-white">Wall</span>
+                             </button>
+                             <button onclick="Editor.setTool(0)" id="t-0" class="tool-btn h-20 bg-slate-800 hover:bg-slate-700 rounded-lg border-2 border-transparent transition flex flex-col items-center justify-center gap-2 group">
+                                <div class="w-8 h-8 bg-slate-950 border border-slate-600 rounded group-hover:scale-110 transition"></div>
+                                <span class="text-xs font-bold text-slate-400 group-hover:text-white">Path</span>
+                             </button>
+                             <button onclick="Editor.setTool(2)" id="t-2" class="tool-btn h-20 bg-slate-800 hover:bg-slate-700 rounded-lg border-2 border-transparent transition flex flex-col items-center justify-center gap-2 group">
+                                <div class="w-8 h-8 bg-emerald-500 rounded-full group-hover:scale-110 transition"></div>
+                                <span class="text-xs font-bold text-slate-400 group-hover:text-white">Start</span>
+                             </button>
+                             <button onclick="Editor.setTool(3)" id="t-3" class="tool-btn h-20 bg-slate-800 hover:bg-slate-700 rounded-lg border-2 border-transparent transition flex flex-col items-center justify-center gap-2 group">
+                                <div class="w-8 h-8 bg-red-500 rounded-full shadow-[0_0_8px_red] group-hover:scale-110 transition"></div>
+                                <span class="text-xs font-bold text-slate-400 group-hover:text-white">End</span>
+                             </button>
+                         </div>
                     </div>
-                    <div class="w-1/2 md:w-full px-1">
-                        <div class="flex justify-between text-[10px] text-slate-500 font-bold mb-1">
-                            <span>ZOOM</span>
-                        </div>
-                        <input type="range" min="1" max="3" step="0.1" value="1" oninput="Editor.setZoom(this.value)" class="w-full accent-cyan-500 h-2 bg-slate-900 rounded-lg appearance-none cursor-pointer">
-                    </div>
-                </div>
-                <div class="h-px bg-slate-700 my-1 w-full hidden md:block"></div>
-                <div class="flex gap-2 w-full items-center">
-                    <div class="bg-slate-900 p-1 md:p-2 rounded border border-slate-700 flex-1 md:w-full">
-                        <div class="text-[10px] text-slate-500 font-bold mb-1 uppercase tracking-wider hidden md:block">Generator</div>
-                        <div class="flex gap-1 items-center">
-                            <div class="flex gap-1 flex-1">
-                                <input id="ed-code" type="text" placeholder="CODE" class="w-full bg-slate-800 border border-slate-600 text-white text-[10px] px-1 h-6 rounded uppercase">
-                                <button onclick="Utils.randomCode('ed-code')" class="bg-slate-700 text-slate-300 w-6 h-6 rounded flex items-center justify-center shrink-0"><i class="ph ph-dice-five"></i></button>
+
+                    <!-- Divider -->
+                    <div class="h-px bg-slate-800"></div>
+
+                    <!-- Settings Section -->
+                    <div class="space-y-4">
+                        <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wider">Properties</h3>
+                        
+                        <div class="space-y-1">
+                            <div class="flex justify-between text-xs text-slate-400">
+                                <span>Grid Size</span> <span id="lbl-size" class="font-mono text-cyan-400">10x</span>
                             </div>
-                            <select id="ed-size" class="bg-slate-800 text-slate-300 border border-slate-600 rounded text-[10px] h-6 px-1 w-12 md:w-16">
+                            <input type="range" min="10" max="50" step="5" value="10" onchange="Editor.resize(this.value)" class="w-full accent-cyan-500 h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer">
+                        </div>
+
+                        <div class="space-y-1">
+                            <div class="flex justify-between text-xs text-slate-400">
+                                <span>Zoom Level</span>
+                            </div>
+                            <input type="range" min="0.5" max="3" step="0.1" value="1" oninput="Editor.setZoom(this.value)" class="w-full accent-cyan-500 h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer">
+                        </div>
+                    </div>
+
+                    <!-- Generator Section -->
+                    <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-3">
+                        <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2"><i class="ph ph-magic-wand"></i> Generator</h3>
+                        
+                        <div class="flex gap-2">
+                            <div class="relative flex-1">
+                                <input id="ed-code" type="text" placeholder="SEED" class="w-full bg-slate-900 border border-slate-700 text-white text-xs px-2 h-8 rounded uppercase font-mono focus:border-cyan-500 outline-none">
+                                <button onclick="Utils.randomCode('ed-code')" class="absolute right-1 top-1 text-slate-500 hover:text-white p-1"><i class="ph ph-dice-five"></i></button>
+                            </div>
+                            <select id="ed-size" class="bg-slate-900 text-slate-300 border border-slate-700 rounded text-xs h-8 px-1 w-14">
                                 <option value="11">10x</option>
                                 <option value="25" selected>25x</option>
                                 <option value="51">50x</option>
                             </select>
-                            <button onclick="Editor.generateFromCode()" class="bg-cyan-700 text-white text-[10px] h-6 px-2 rounded font-bold">GEN</button>
                         </div>
+                        <button onclick="Editor.generateFromCode()" class="w-full bg-cyan-700 hover:bg-cyan-600 text-white text-xs h-8 rounded font-bold transition">GENERATE</button>
                     </div>
-                    <button onclick="Editor.clear()" class="md:mt-auto border border-red-900 text-red-400 p-1 md:p-2 rounded text-[10px] md:text-xs hover:bg-red-900/20 font-bold h-full md:h-auto w-12 md:w-full flex flex-col items-center justify-center">
-                        <i class="ph ph-trash text-lg md:hidden"></i>
-                        <span class="hidden md:inline">CLEAR MAP</span>
+
+                    <button onclick="Editor.clear()" class="w-full border border-red-900/50 text-red-400 hover:bg-red-900/20 py-3 rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition">
+                        <i class="ph ph-trash text-lg"></i> CLEAR MAP
                     </button>
                 </div>
             </div>
-            <div id="editor-viewport" class="flex-1 bg-slate-950 relative p-4 md:p-8 mode-draw overflow-hidden">
+
+            <!-- Viewport -->
+            <div id="editor-viewport" class="flex-1 bg-grid-pattern relative p-8 mode-draw overflow-hidden flex items-center justify-center">
                 <div id="editor-grid"></div>
             </div>
         </div>
@@ -337,8 +398,10 @@
         const CONST = {
             WALL: 1, PATH: 0, START: 2, END: 3,
             CELL_SIZE: 4, 
-            SPEED_3D: 0.05, SPEED_2D: 0.15,
-            ROT_SPEED: 0.04, COLLISION_RADIUS: 0.15
+            SPEED_3D: 0.05, // REVERTED TO SLOWER SPEED
+            SPEED_2D: 0.15,
+            ROT_SPEED: 0.04, 
+            COLLISION_RADIUS: 0.2
         };
 
         const Utils = {
@@ -509,8 +572,15 @@
                 if(this.initialized) return; this.initialized = true;
                 const k = (e,v) => {
                     const key = e.key.toLowerCase();
+                    // Movement
                     if(key==='w'||key==='arrowup') this.keys.w=v; if(key==='s'||key==='arrowdown') this.keys.s=v;
                     if(key==='a'||key==='arrowleft') this.keys.l=v; if(key==='d'||key==='arrowright') this.keys.r=v;
+                    
+                    // --- KEYBOARD SHORTCUTS ---
+                    if (v && Game.running) {
+                        if (key === 'm') Game.toggleDimension();
+                        if (key === 'v') Game.toggleCamera();
+                    }
                 };
                 window.addEventListener('keydown', e=>k(e,true)); window.addEventListener('keyup', e=>k(e,false));
                 if('ontouchstart' in window || navigator.maxTouchPoints > 0) { this.stick = new Joystick('stick-zone', 'stick-thumb'); } 
@@ -658,7 +728,7 @@
                 const floorMat = new THREE.MeshLambertMaterial({ map: this.floorTex });
                 const floor = new THREE.Mesh(floorGeo, floorMat);
                 floor.rotation.x = -Math.PI/2;
-                floor.position.set(w*2, 0, h*2); // CHANGED: Floor is now at Y=0
+                floor.position.set(w*2, 0, h*2); 
                 this.scene.add(floor);
 
                 // Walls
@@ -674,21 +744,57 @@
                         const t = map[z][x];
                         const worldX = x * 4 + 2; const worldZ = z * 4 + 2;
                         if(t === CONST.WALL) {
-                            dummy.position.set(worldX, 2, worldZ); // CHANGED: Walls centered at Y=2 to sit on floor (0-4 range)
+                            dummy.position.set(worldX, 2, worldZ);
                             dummy.updateMatrix();
                             this.wallsMesh.setMatrixAt(idx++, dummy.matrix);
                         } else if(t === CONST.END) {
                             const orb = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 16), new THREE.MeshBasicMaterial({ color: 0xef4444 }));
-                            orb.position.set(worldX, 2, worldZ); // CHANGED: Orb centered at Y=2
+                            orb.position.set(worldX, 2, worldZ);
                             this.scene.add(orb);
                             const pl = new THREE.PointLight(0xff0000, 2, 8);
-                            pl.position.set(worldX, 2, worldZ); // CHANGED: Light centered at Y=2
+                            pl.position.set(worldX, 2, worldZ); 
                             this.scene.add(pl);
                         }
                     }
                 }
                 this.scene.add(this.wallsMesh);
             },
+            
+            // --- PHYSICS CAMERA CLIP ---
+            getSafeCameraPos(px, pz, tx, tz, map, w, h) {
+                // Raycast-lite: Check points along the line from Player to Target
+                const dx = tx - px;
+                const dz = tz - pz;
+                const dist = Math.sqrt(dx*dx + dz*dz);
+                const steps = Math.ceil(dist * 2); // Check every 0.5 units
+                
+                // Buffer to keep camera slightly away from wall
+                const buffer = 0.5;
+
+                for(let i = 1; i <= steps; i++) {
+                    const t = i / steps;
+                    const cx = px + dx * t;
+                    const cz = pz + dz * t;
+                    
+                    // Convert World Coords (units) to Grid Coords
+                    // Map scale is 4 units per cell.
+                    const gx = Math.floor(cx / 4);
+                    const gz = Math.floor(cz / 4);
+                    
+                    if (gx >= 0 && gx < w && gz >= 0 && gz < h) {
+                        if (map[gz][gx] === CONST.WALL) {
+                            // Hit a wall! Return position just before this step
+                            const safeT = Math.max(0, (i - 1.5) / steps);
+                            return { 
+                                x: px + dx * safeT, 
+                                z: pz + dz * safeT 
+                            };
+                        }
+                    }
+                }
+                return { x: tx, z: tz };
+            },
+
             snapCamera: true, // Flag to reset lerp
             render(player, is2D, isThirdPerson) {
                 // Update Player Mesh Position
@@ -696,22 +802,27 @@
                 const pz = player.z * 4;
                 
                 if (this.playerMesh) {
-                    this.playerMesh.position.set(px, 0, pz); // Player feet at Y=0 (on floor)
-                    this.playerMesh.rotation.y = player.dir + Math.PI; // Correct rotation for model facing
+                    this.playerMesh.position.set(px, 0, pz);
+                    this.playerMesh.rotation.y = player.dir + Math.PI; 
                     this.playerMesh.visible = isThirdPerson;
                 }
 
                 // Camera Logic
                 if (!is2D) {
                     if (isThirdPerson) {
-                        // Smooth Third Person Camera
+                        // Smooth Third Person Camera with Wall Clipping Fix
                         const dist = 10;
-                        const height = 10; // Slightly higher to account for new wall height
-                        // Calculate target position based on player direction (behind the player)
-                        // Player moves in -sin, -cos direction. So behind is +sin, +cos
-                        const targetX = px + Math.sin(player.dir) * dist;
-                        const targetZ = pz + Math.cos(player.dir) * dist;
+                        const height = 10;
                         
+                        // Ideal Position (Behind Player)
+                        let targetX = px + Math.sin(player.dir) * dist;
+                        let targetZ = pz + Math.cos(player.dir) * dist;
+                        
+                        // Check for walls between Player and Ideal Camera Position
+                        const safePos = this.getSafeCameraPos(px, pz, targetX, targetZ, Game.map, Game.w, Game.h);
+                        targetX = safePos.x;
+                        targetZ = safePos.z;
+
                         if (this.snapCamera) {
                             this.camera.position.set(targetX, height, targetZ);
                             this.snapCamera = false;
@@ -720,18 +831,17 @@
                             const idealPos = new THREE.Vector3(targetX, height, targetZ);
                             this.camera.position.lerp(idealPos, 0.1);
                         }
-                        this.camera.lookAt(px, 1, pz); // Look at player center (Y=1 approx)
+                        this.camera.lookAt(px, 1, pz); 
                     } else {
                         // First Person (Snappy)
-                        this.camera.position.set(px, 1.6, pz); // CHANGED: Eye level at 1.6m above floor
+                        this.camera.position.set(px, 1.6, pz);
                         const tx = px - Math.sin(player.dir);
                         const tz = pz - Math.cos(player.dir);
                         this.camera.lookAt(tx, 1.6, tz);
-                        this.snapCamera = true; // Reset snap for when we switch back to 3rd
+                        this.snapCamera = true; 
                     }
                     
-                    // Light follows player (but offset slightly above walls)
-                    this.pl.position.set(px, 5, pz); // CHANGED: Above walls
+                    this.pl.position.set(px, 5, pz);
                     this.renderer.render(this.scene, this.camera);
                 }
             },
@@ -743,7 +853,6 @@
                     if(cvs.width !== window.innerWidth) { cvs.width=window.innerWidth; cvs.height=window.innerHeight; }
                     ctx.fillStyle = '#020617'; ctx.fillRect(0,0,cvs.width,cvs.height);
                 } else {
-                    // Update canvas size to match visual size (sharpness)
                     const wrapper = document.getElementById('minimap-wrapper');
                     if(cvs.width !== wrapper.clientWidth || cvs.height !== wrapper.clientHeight) {
                         cvs.width = wrapper.clientWidth;
@@ -758,7 +867,6 @@
                 const oy = (cvs.height - h*scale)/2;
                 for(let z=0; z<h; z++) for(let x=0; x<w; x++) {
                     const t = map[z][x];
-                    // CHANGED: Include START (t===2) in minimap rendering
                     if(isMini && t!==CONST.WALL && t!==CONST.END && t!==CONST.START) continue;
                     this.drawCell(ctx, t, ox+x*scale, oy+z*scale, scale);
                 }
@@ -792,7 +900,7 @@
                 document.getElementById('inp-code').addEventListener('keyup', (e)=>{ if(e.key === 'Enter') this.start('code'); });
             },
             start(mode) {
-                Sfx.init(); // Initialize audio context on interaction
+                Sfx.init(); 
                 if (!GFX.scene) this.init(); 
                 let w=15, h=15; let rng = Math.random;
                 Timer.reset();
@@ -815,34 +923,28 @@
                 for(let z=0;z<this.h;z++) for(let x=0;x<this.w;x++) if(this.map[z][x]===CONST.START) { this.player.x=x+0.5; this.player.z=z+0.5; found=true; }
                 if(!found){this.player.x=1.5;this.player.z=1.5;}
                 
-                // --- NEW ORIENTATION LOGIC ---
-                // Find open neighbor to face
                 const startX = Math.floor(this.player.x);
                 const startZ = Math.floor(this.player.z);
                 
-                // Helper to check valid path
                 const isPath = (x, z) => {
                     if (x < 0 || x >= this.w || z < 0 || z >= this.h) return false;
                     return this.map[z][x] !== CONST.WALL;
                 };
 
-                // Default to South (Math.PI)
                 let startDir = Math.PI;
 
-                if (isPath(startX, startZ - 1)) startDir = 0;           // Face North
-                else if (isPath(startX, startZ + 1)) startDir = Math.PI; // Face South
-                else if (isPath(startX - 1, startZ)) startDir = Math.PI/2; // Face West
-                else if (isPath(startX + 1, startZ)) startDir = -Math.PI/2; // Face East
+                if (isPath(startX, startZ - 1)) startDir = 0;           
+                else if (isPath(startX, startZ + 1)) startDir = Math.PI; 
+                else if (isPath(startX - 1, startZ)) startDir = Math.PI/2; 
+                else if (isPath(startX + 1, startZ)) startDir = -Math.PI/2; 
 
                 this.player.dir = startDir;
-                // -----------------------------
 
                 GFX.build(this.map, this.w, this.h);
                 document.querySelectorAll('.ui-screen').forEach(e => e.classList.add('hidden'));
                 document.getElementById('screen-game').classList.remove('hidden');
                 document.getElementById('screen-game').classList.add('flex');
                 
-                // Defaults
                 this.is2D = false;
                 this.isThirdPerson = false;
                 GFX.snapCamera = true;
@@ -868,13 +970,11 @@
                 document.getElementById('c2d').style.display = this.is2D ? 'block' : 'none';
                 document.getElementById('minimap-wrapper').style.display = !this.is2D ? 'block' : 'none';
                 
-                // Dimension Button
                 const dimIcon = this.is2D ? 'ph-cube' : 'ph-map-trifold';
                 const dimText = this.is2D ? '3D View' : '2D Map';
                 document.getElementById('icon-dim').className = `ph ${dimIcon} text-lg`;
                 document.getElementById('lbl-dim').innerText = dimText;
 
-                // POV Button (Disabled visually in 2D)
                 const povBtn = document.getElementById('btn-pov');
                 if (this.is2D) {
                     povBtn.classList.add('opacity-50', 'grayscale');
@@ -904,7 +1004,6 @@
                         const dz = -Math.cos(this.player.dir) * speed;
                         this.move(dx, dz);
                         
-                        // Step Sound
                         if(Date.now() - this.stepTimer > 400) {
                             Sfx.step();
                             this.stepTimer = Date.now();
@@ -936,16 +1035,77 @@
                     GFX.render2D(this.map, this.w, this.h, this.player, 'c2d');
                 }
             },
+            // --- UPDATED PHYSICS MOVE ---
             move(dx, dz) {
-                if(!this.col(this.player.x+dx, this.player.z)) { this.player.x+=dx; }
-                if(!this.col(this.player.x, this.player.z+dz)) { this.player.z+=dz; }
+                // Independent axis check for sliding
+                let nextX = this.player.x + dx;
+                let nextZ = this.player.z + dz;
+
+                // 1. Try X movement
+                if (!this.col(nextX, this.player.z)) {
+                    this.player.x = nextX;
+                } else {
+                    // Wall Slide/Corner Assist: If blocked on X, check if we are near a corner on Z
+                    // This helps round corners smoothly if the player is slightly misaligned
+                    // Only apply if NOT trying to move Z this frame (pure rotation or slight drift)
+                    if (Math.abs(dz) < 0.01) {
+                         const gridZ = Math.floor(this.player.z);
+                         const distToTop = this.player.z - gridZ;
+                         const distToBottom = (gridZ + 1) - this.player.z;
+                         
+                         // If very close to top edge and top neighbor is open, nudge up
+                         if (distToTop < 0.3 && !this.col(nextX, gridZ - 0.5)) {
+                             this.player.z -= 0.05;
+                         }
+                         // If very close to bottom edge and bottom neighbor is open, nudge down
+                         if (distToBottom < 0.3 && !this.col(nextX, gridZ + 1.5)) {
+                             this.player.z += 0.05;
+                         }
+                    }
+                }
+
+                // 2. Try Z movement
+                if (!this.col(this.player.x, nextZ)) {
+                    this.player.z = nextZ;
+                } else {
+                     // Same corner assist for Z blocked
+                     if (Math.abs(dx) < 0.01) {
+                         const gridX = Math.floor(this.player.x);
+                         const distToLeft = this.player.x - gridX;
+                         const distToRight = (gridX + 1) - this.player.x;
+                         
+                         if (distToLeft < 0.3 && !this.col(gridX - 0.5, nextZ)) {
+                             this.player.x -= 0.05;
+                         }
+                         if (distToRight < 0.3 && !this.col(gridX + 1.5, nextZ)) {
+                             this.player.x += 0.05;
+                         }
+                     }
+                }
+                
+                // 3. Resolve overlap (Emergency push out)
+                if (this.col(this.player.x, this.player.z)) {
+                     // Push back towards center of current cell
+                     const cx = Math.floor(this.player.x) + 0.5;
+                     const cz = Math.floor(this.player.z) + 0.5;
+                     this.player.x += (cx - this.player.x) * 0.1;
+                     this.player.z += (cz - this.player.z) * 0.1;
+                }
             },
             col(x, z) {
                 const r = CONST.COLLISION_RADIUS;
-                const minX=Math.floor(x-r), maxX=Math.floor(x+r), minZ=Math.floor(z-r), maxZ=Math.floor(z+r);
-                for(let cz=minZ; cz<=maxZ; cz++) for(let cx=minX; cx<=maxX; cx++) {
-                    if(cz<0||cz>=this.h||cx<0||cx>=this.w) return true;
-                    if(this.map[cz][cx]===CONST.WALL) return true;
+                // Check all 4 corners of the bounding box
+                const points = [
+                    {x: x-r, z: z-r}, {x: x+r, z: z-r},
+                    {x: x-r, z: z+r}, {x: x+r, z: z+r}
+                ];
+                
+                for(let p of points) {
+                    const cx = Math.floor(p.x);
+                    const cz = Math.floor(p.z);
+                    
+                    if(cx < 0 || cx >= this.w || cz < 0 || cz >= this.h) return true;
+                    if(this.map[cz][cx] === CONST.WALL) return true;
                 }
                 return false;
             },
@@ -997,14 +1157,37 @@
             setTool(t) { this.tool = t; this.updateUI(); },
             setMode(m) { 
                 this.mode = m; 
-                document.getElementById('editor-viewport').className = `flex-1 bg-slate-950 relative p-4 md:p-8 mode-${m} overflow-hidden`;
+                document.getElementById('editor-viewport').className = `flex-1 bg-grid-pattern relative p-8 mode-${m} overflow-hidden flex items-center justify-center`;
                 this.updateUI();
             },
             updateUI() {
-                document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('border-cyan-400', 'bg-slate-600'));
-                document.getElementById('t-'+this.tool).classList.add('border-cyan-400', 'bg-slate-600');
-                document.getElementById('btn-mode-draw').className = `flex-1 rounded transition flex justify-center items-center text-xs font-bold ${this.mode==='draw'?'bg-cyan-700 text-white':'text-slate-400 hover:text-white'}`;
-                document.getElementById('btn-mode-pan').className = `flex-1 rounded transition flex justify-center items-center text-xs font-bold ${this.mode==='pan'?'bg-cyan-700 text-white':'text-slate-400 hover:text-white'}`;
+                document.querySelectorAll('.tool-btn').forEach(b => {
+                    b.classList.remove('border-cyan-400', 'bg-slate-700');
+                    b.classList.add('bg-slate-800', 'border-transparent');
+                    b.querySelector('span').classList.remove('text-white');
+                    b.querySelector('span').classList.add('text-slate-400');
+                });
+                
+                const activeBtn = document.getElementById('t-'+this.tool);
+                activeBtn.classList.remove('bg-slate-800', 'border-transparent');
+                activeBtn.classList.add('bg-slate-700', 'border-cyan-400');
+                activeBtn.querySelector('span').classList.remove('text-slate-400');
+                activeBtn.querySelector('span').classList.add('text-white');
+
+                const drawBtn = document.getElementById('btn-mode-draw');
+                const panBtn = document.getElementById('btn-mode-pan');
+                
+                if(this.mode === 'draw') {
+                    drawBtn.classList.add('bg-cyan-700', 'text-white');
+                    drawBtn.classList.remove('text-slate-400', 'hover:text-white');
+                    panBtn.classList.remove('bg-cyan-700', 'text-white');
+                    panBtn.classList.add('text-slate-400', 'hover:text-white');
+                } else {
+                    panBtn.classList.add('bg-cyan-700', 'text-white');
+                    panBtn.classList.remove('text-slate-400', 'hover:text-white');
+                    drawBtn.classList.remove('bg-cyan-700', 'text-white');
+                    drawBtn.classList.add('text-slate-400', 'hover:text-white');
+                }
             },
             resize(v) { 
                 this.size = parseInt(v); 
@@ -1035,11 +1218,9 @@
                 const el = document.getElementById('editor-grid');
                 const viewport = document.getElementById('editor-viewport');
                 el.innerHTML = '';
-                const pad = 32; 
-                const availW = viewport.clientWidth - pad;
-                const availH = viewport.clientHeight - pad;
-                const baseSize = Math.floor(Math.min(availW, availH) / this.size);
-                const cellSize = Math.floor(baseSize * this.zoom);
+                // No complex calc needed due to flex centering, just render grid
+                const cellSize = Math.floor(16 * this.zoom); // Base 16px * zoom
+                
                 el.style.gridTemplateColumns = `repeat(${this.size}, ${cellSize}px)`;
                 el.style.width = 'fit-content'; 
                 const frag = document.createDocumentFragment();
