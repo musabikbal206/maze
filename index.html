@@ -32,17 +32,16 @@
         .interactive { pointer-events: auto; }
         .hidden { display: none !important; }
 
-        /* Minimap */
+        /* Minimap - Relative positioning inside flex container */
         #minimap-wrapper {
-            position: absolute; top: 16px; right: 16px;
-            width: 140px; height: 140px;
+            width: 180px; height: 180px;
             background: rgba(15, 23, 42, 0.9);
             border: 2px solid rgba(255,255,255,0.1);
-            border-radius: 50%;
-            z-index: 30;
+            border-radius: 12px; /* Square with rounded corners */
             overflow: hidden;
-            display: none;
+            display: none; /* Toggled by JS */
             box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            /* Removed absolute positioning to let flexbox handle it */
         }
 
         /* Timer */
@@ -141,11 +140,6 @@
     <!-- Timer -->
     <div id="game-timer">00:00</div>
 
-    <!-- Minimap -->
-    <div id="minimap-wrapper">
-        <canvas id="minimap"></canvas>
-    </div>
-
     <!-- Joystick (Game Only) -->
     <div id="controls-ui">
         <div class="stick-zone" id="stick-zone">
@@ -213,6 +207,7 @@
     <!-- Game UI -->
     <div id="screen-game" class="ui-screen hidden justify-between p-4 z-40">
         <div class="flex justify-between w-full interactive items-start">
+            <!-- Left Side controls -->
             <div class="flex flex-col gap-2">
                 <button onclick="Game.toggleView()" class="bg-slate-900/80 backdrop-blur text-cyan-400 border border-cyan-900/50 px-4 py-2 rounded-lg font-bold shadow-lg flex items-center gap-2 text-sm w-fit">
                     <i class="ph ph-eye text-lg"></i> <span id="lbl-view">2D Map</span>
@@ -223,9 +218,16 @@
                 </div>
             </div>
 
-            <button onclick="Game.quit()" class="bg-red-950/80 backdrop-blur text-red-200 border border-red-900/50 px-4 py-2 rounded-lg font-bold shadow-lg text-sm">
-                Exit
-            </button>
+            <!-- Right Side controls: Exit & Minimap -->
+            <div class="flex flex-col items-end gap-2">
+                <button onclick="Game.quit()" class="bg-red-950/80 backdrop-blur text-red-200 border border-red-900/50 px-4 py-2 rounded-lg font-bold shadow-lg text-sm">
+                    Exit
+                </button>
+                <!-- Minimap Moved Here -->
+                <div id="minimap-wrapper">
+                    <canvas id="minimap"></canvas>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -378,11 +380,12 @@
 
         // --- TIMER ---
         const Timer = {
-            el: null, startTime: 0, interval: null, running: false,
+            el: null, elapsed: 0, lastTick: 0, interval: null, running: false,
             init() { this.el = document.getElementById('game-timer'); },
             start() {
                 this.running = true;
-                this.startTime = Date.now();
+                this.elapsed = 0;
+                this.lastTick = Date.now();
                 this.el.style.display = 'block';
                 this.update();
                 this.interval = setInterval(() => this.update(), 100);
@@ -390,16 +393,27 @@
             stop() {
                 this.running = false;
                 clearInterval(this.interval);
-                return this.format(Date.now() - this.startTime);
+                return this.format(this.elapsed);
             },
             reset() {
-                this.stop();
+                this.running = false;
+                clearInterval(this.interval);
+                this.elapsed = 0;
                 this.el.style.display = 'none';
                 this.el.innerText = '00:00';
             },
             update() {
-                const delta = Date.now() - this.startTime;
-                this.el.innerText = this.format(delta);
+                if(!this.running) return;
+                const now = Date.now();
+                const delta = now - this.lastTick;
+                this.lastTick = now;
+
+                // Time Dilation: 2D is faster based on movement speed ratio
+                // 3D is "normal" (1x). 2D is faster (approx 3x)
+                const multiplier = Game.mode3D ? 1 : (CONST.SPEED_2D / CONST.SPEED_3D);
+                
+                this.elapsed += delta * multiplier;
+                this.el.innerText = this.format(this.elapsed);
             },
             format(ms) {
                 const totalSecs = Math.floor(ms / 1000);
@@ -723,8 +737,9 @@
                     if(cvs.width !== window.innerWidth) { cvs.width=window.innerWidth; cvs.height=window.innerHeight; }
                     ctx.fillStyle = '#020617'; ctx.fillRect(0,0,cvs.width,cvs.height);
                 } else {
-                    cvs.width=140; cvs.height=140;
-                    ctx.fillStyle = "rgba(15, 23, 42, 0.95)"; ctx.fillRect(0,0,140,140);
+                    // Update minimap size to match CSS (180x180)
+                    cvs.width=180; cvs.height=180;
+                    ctx.fillStyle = "rgba(15, 23, 42, 0.95)"; ctx.fillRect(0,0,180,180);
                 }
 
                 const pad = isMini ? 0 : 40;
@@ -980,7 +995,7 @@
                 const gridEl = document.getElementById('editor-grid');
                 if(gridEl.children[idx]) gridEl.children[idx].className = `grid-cell ${this.getClass(type)}`;
             },
-            getClass(t) { return t===1?'c-wall':t===2?'c-start':t===3?'c-end':'c-path'; },
+            getClass(t) { return t===1?'c-wall':t===3?'c-end':t===2?'c-start':'c-path'; },
             render() {
                 const el = document.getElementById('editor-grid');
                 const viewport = document.getElementById('editor-viewport');
