@@ -1,0 +1,942 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Mazemazing: Timer Edition</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+    <style>
+        /* Core Reset */
+        body, html { margin: 0; padding: 0; overflow: hidden; background-color: #020617; touch-action: none; font-family: 'Segoe UI', system-ui, sans-serif; height: 100%; width: 100%; user-select: none; -webkit-user-select: none; }
+        
+        /* Game Layer */
+        #game-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
+        canvas { display: block; width: 100%; height: 100%; outline: none; }
+        
+        /* UI Screens */
+        .ui-screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 20; display: flex; flex-direction: column; }
+        .interactive { pointer-events: auto; }
+        .hidden { display: none !important; }
+
+        /* Minimap */
+        #minimap-wrapper {
+            position: absolute; top: 16px; right: 16px;
+            width: 140px; height: 140px;
+            background: rgba(15, 23, 42, 0.9);
+            border: 2px solid rgba(255,255,255,0.1);
+            border-radius: 50%;
+            z-index: 30;
+            overflow: hidden;
+            display: none;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        }
+
+        /* Timer */
+        #game-timer {
+            position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(4px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 8px 16px;
+            border-radius: 99px;
+            font-family: monospace;
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #22d3ee;
+            z-index: 30;
+            display: none;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+
+        /* --- SINGLE JOYSTICK --- */
+        #controls-ui { display: none; width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 50; pointer-events: none; }
+        
+        .stick-zone {
+            position: absolute; bottom: 40px; left: 40px; 
+            width: 160px; height: 160px;
+            pointer-events: auto;
+        }
+
+        .stick-base {
+            width: 100%; height: 100%;
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px solid rgba(255, 255, 255, 0.15);
+            border-radius: 50%;
+            position: relative;
+            backdrop-filter: blur(4px);
+            transition: border-color 0.2s;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        
+        .stick-thumb {
+            width: 70px; height: 70px;
+            background: radial-gradient(circle at 30% 30%, #22d3ee, #0891b2);
+            border-radius: 50%;
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 4px 15px rgba(8, 145, 178, 0.5);
+            pointer-events: none;
+            transition: transform 0.05s linear;
+        }
+
+        /* Editor Grid */
+        .grid-cell { box-sizing: border-box; border: 1px solid rgba(255,255,255,0.05); cursor: pointer; }
+        .c-wall { background: #475569; }
+        .c-path { background: #0f172a; }
+        .c-start { background: #10b981; }
+        .c-end { background: #ef4444; }
+
+        /* Scrollable Viewport logic */
+        #editor-viewport {
+            overflow: auto; 
+            touch-action: pan-x pan-y;
+            cursor: grab;
+        }
+        #editor-viewport.mode-draw {
+            touch-action: none; 
+            cursor: crosshair;
+        }
+        
+        #editor-grid {
+            display: grid;
+            box-shadow: 0 0 50px rgba(0,0,0,0.5);
+            margin: auto;
+            transform-origin: top left;
+        }
+
+        /* Code Input Animation */
+        @keyframes glow {
+            0% { box-shadow: 0 0 5px rgba(34, 211, 238, 0.2); }
+            50% { box-shadow: 0 0 20px rgba(34, 211, 238, 0.6); }
+            100% { box-shadow: 0 0 5px rgba(34, 211, 238, 0.2); }
+        }
+        .input-glow:focus {
+            animation: glow 2s infinite;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Game Layer -->
+    <div id="game-layer">
+        <canvas id="c3d"></canvas>
+        <canvas id="c2d" style="display:none; background:#020617;"></canvas>
+    </div>
+
+    <!-- Timer -->
+    <div id="game-timer">00:00</div>
+
+    <!-- Minimap -->
+    <div id="minimap-wrapper">
+        <canvas id="minimap"></canvas>
+    </div>
+
+    <!-- Joystick (Game Only) -->
+    <div id="controls-ui">
+        <div class="stick-zone" id="stick-zone">
+            <div class="stick-base">
+                <div class="stick-thumb" id="stick-thumb"></div>
+            </div>
+            <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none opacity-30 text-white text-2xl">
+                <i class="ph ph-arrows-out-cardinal"></i>
+            </div>
+        </div>
+    </div>
+
+    <!-- Desktop Hint -->
+    <div id="controls-hint" class="ui-screen hidden md:flex justify-end items-end p-8 z-10 pointer-events-none">
+        <div class="bg-slate-900/80 backdrop-blur p-4 rounded-xl border border-white/10 text-slate-400 text-sm font-mono">
+            <div class="flex items-center gap-4"><span class="bg-slate-700 px-2 rounded text-white">WASD</span> <span>Move</span></div>
+        </div>
+    </div>
+
+    <!-- Main Menu -->
+    <div id="screen-menu" class="ui-screen interactive bg-slate-950/95 flex items-center justify-center overflow-y-auto">
+        <div class="text-center max-w-md w-full p-6 my-auto">
+            <h1 class="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-600 mb-2">MAZEMAZING</h1>
+            <p class="text-slate-500 mb-8 font-mono text-sm">3D / 2D Engine</p>
+
+            <div class="space-y-3">
+                <button onclick="Game.start('easy')" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-4 rounded-xl font-bold shadow-lg transition transform active:scale-95">Easy (10x10)</button>
+                <button onclick="Game.start('medium')" class="w-full bg-amber-600 hover:bg-amber-500 text-white py-4 rounded-xl font-bold shadow-lg transition transform active:scale-95">Medium (25x25)</button>
+                <button onclick="Game.start('hard')" class="w-full bg-rose-600 hover:bg-rose-500 text-white py-4 rounded-xl font-bold shadow-lg transition transform active:scale-95 border border-rose-400/30">Hard (50x50)</button>
+                
+                <div class="relative py-4 flex items-center">
+                    <div class="flex-grow border-t border-slate-800"></div>
+                    <span class="flex-shrink-0 mx-4 text-slate-600 text-xs font-bold">OR USE A CODE</span>
+                    <div class="flex-grow border-t border-slate-800"></div>
+                </div>
+
+                <div class="bg-slate-900/50 p-3 rounded-xl border border-slate-800 space-y-2">
+                    <div class="flex gap-2">
+                        <input id="inp-code" type="text" placeholder="CODE" class="input-glow flex-1 bg-slate-950 border border-slate-700 text-cyan-400 font-mono font-bold text-center rounded-lg px-2 h-10 focus:outline-none focus:border-cyan-500 transition placeholder-slate-600 uppercase">
+                        <button onclick="Utils.randomCode('inp-code')" class="w-10 h-10 bg-slate-800 text-slate-300 hover:text-white rounded-lg flex items-center justify-center transition" title="Random Code">
+                            <i class="ph ph-dice-five text-xl"></i>
+                        </button>
+                    </div>
+                    
+                    <div class="flex gap-2">
+                         <select id="inp-size" class="h-10 bg-slate-950 text-slate-300 border border-slate-700 rounded-lg px-2 text-xs font-bold outline-none focus:border-cyan-500">
+                             <option value="11">SMALL (10x10)</option>
+                             <option value="25" selected>MEDIUM (25x25)</option>
+                             <option value="51">LARGE (50x50)</option>
+                         </select>
+                         <button onclick="Game.start('code')" class="flex-1 h-10 bg-cyan-700 hover:bg-cyan-600 text-white rounded-lg font-bold shadow-lg transition transform active:scale-95 text-sm">
+                             LOAD MAP
+                         </button>
+                    </div>
+                </div>
+
+                <div class="h-4"></div>
+                <button onclick="Editor.open()" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 py-3 rounded-xl font-bold shadow-lg flex items-center justify-center gap-2">
+                    <i class="ph ph-pencil-simple"></i> Map Editor
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game UI -->
+    <div id="screen-game" class="ui-screen hidden justify-between p-4 z-40">
+        <div class="flex justify-between w-full interactive items-start">
+            <div class="flex flex-col gap-2">
+                <button onclick="Game.toggleView()" class="bg-slate-900/80 backdrop-blur text-cyan-400 border border-cyan-900/50 px-4 py-2 rounded-lg font-bold shadow-lg flex items-center gap-2 text-sm w-fit">
+                    <i class="ph ph-eye text-lg"></i> <span id="lbl-view">2D Map</span>
+                </button>
+                <!-- Current Code Display -->
+                <div id="ui-code-display" class="hidden bg-slate-900/60 backdrop-blur text-slate-400 border border-slate-800 px-3 py-1 rounded-lg text-xs font-mono">
+                    CODE: <span class="text-white font-bold" id="ui-code-val">---</span>
+                </div>
+            </div>
+
+            <button onclick="Game.quit()" class="bg-red-950/80 backdrop-blur text-red-200 border border-red-900/50 px-4 py-2 rounded-lg font-bold shadow-lg text-sm">
+                Exit
+            </button>
+        </div>
+    </div>
+
+    <!-- Editor UI -->
+    <div id="screen-editor" class="ui-screen hidden bg-slate-900 z-50 flex-col interactive">
+        <!-- Header -->
+        <div class="h-14 bg-slate-800 border-b border-slate-700 flex items-center justify-between px-4 shrink-0 shadow-md">
+            <h2 class="font-bold text-cyan-400 flex items-center gap-2"><i class="ph ph-grid-nine"></i> Editor</h2>
+            <div class="flex gap-2">
+                <button onclick="Editor.close()" class="px-3 py-1 text-slate-400 hover:text-white text-sm">Back</button>
+                <button onclick="Game.start('custom')" class="bg-green-600 hover:bg-green-500 text-white px-4 py-1 rounded font-bold shadow-md flex items-center gap-2 text-sm">
+                    <i class="ph ph-play"></i> Play
+                </button>
+            </div>
+        </div>
+
+        <!-- Main Layout: Flex-Col-Reverse on Mobile, Flex-Row on Desktop -->
+        <div class="flex flex-1 overflow-hidden flex-col-reverse md:flex-row">
+            
+            <!-- Toolbar (Bottom on Mobile, Left on Desktop) -->
+            <div class="w-full md:w-56 h-auto md:h-full bg-slate-800 border-t md:border-t-0 md:border-r border-slate-700 flex flex-row md:flex-col flex-wrap gap-2 p-2 shrink-0 overflow-y-auto content-start">
+                
+                <!-- Group 1: Modes & Tools -->
+                <div class="flex gap-2 w-full md:w-full items-stretch h-10 md:h-auto">
+                    <!-- Mode Switch -->
+                    <div class="flex bg-slate-900 rounded p-1 w-[30%] md:w-full shrink-0">
+                        <button onclick="Editor.setMode('draw')" id="btn-mode-draw" class="flex-1 rounded text-slate-400 hover:text-white transition flex justify-center items-center text-xs font-bold bg-cyan-700 text-white">
+                            <i class="ph ph-pencil-simple text-lg md:text-base"></i> <span class="hidden md:inline ml-2">DRAW</span>
+                        </button>
+                        <button onclick="Editor.setMode('pan')" id="btn-mode-pan" class="flex-1 rounded text-slate-400 hover:text-white transition flex justify-center items-center text-xs font-bold">
+                            <i class="ph ph-hand-grabbing text-lg md:text-base"></i> <span class="hidden md:inline ml-2">PAN</span>
+                        </button>
+                    </div>
+
+                    <!-- Tools Row -->
+                    <div class="flex gap-1 flex-1 md:w-full md:grid md:grid-cols-1">
+                         <button onclick="Editor.setTool(1)" id="t-1" class="tool-btn flex-1 bg-slate-700 rounded flex flex-col md:flex-row items-center justify-center gap-2 border border-transparent text-slate-300 text-[10px] md:text-sm transition">
+                            <div class="w-4 h-4 md:w-6 md:h-6 bg-slate-500 border border-slate-400"></div> <span class="hidden md:inline">Wall</span>
+                        </button>
+                        <button onclick="Editor.setTool(0)" id="t-0" class="tool-btn flex-1 bg-slate-700 rounded flex flex-col md:flex-row items-center justify-center gap-2 border border-transparent text-slate-300 text-[10px] md:text-sm transition">
+                            <div class="w-4 h-4 md:w-6 md:h-6 bg-slate-900 border border-slate-600"></div> <span class="hidden md:inline">Path</span>
+                        </button>
+                        <button onclick="Editor.setTool(2)" id="t-2" class="tool-btn flex-1 bg-slate-700 rounded flex flex-col md:flex-row items-center justify-center gap-2 border border-transparent text-slate-300 text-[10px] md:text-sm transition">
+                            <div class="w-4 h-4 md:w-6 md:h-6 bg-emerald-500 rounded-full"></div> <span class="hidden md:inline">Start</span>
+                        </button>
+                        <button onclick="Editor.setTool(3)" id="t-3" class="tool-btn flex-1 bg-slate-700 rounded flex flex-col md:flex-row items-center justify-center gap-2 border border-transparent text-slate-300 text-[10px] md:text-sm transition">
+                            <div class="w-4 h-4 md:w-6 md:h-6 bg-red-500 rounded-full shadow-[0_0_5px_red]"></div> <span class="hidden md:inline">End</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="h-px bg-slate-700 my-1 w-full hidden md:block"></div>
+
+                <!-- Group 2: Sliders -->
+                <div class="flex gap-2 w-full">
+                     <div class="w-1/2 md:w-full px-1">
+                        <div class="flex justify-between text-[10px] text-slate-500 font-bold mb-1">
+                            <span>SIZE</span> <span id="lbl-size">10x</span>
+                        </div>
+                        <input type="range" min="10" max="50" step="5" value="10" onchange="Editor.resize(this.value)" class="w-full accent-cyan-500 h-2 bg-slate-900 rounded-lg appearance-none cursor-pointer">
+                    </div>
+                    
+                    <div class="w-1/2 md:w-full px-1">
+                        <div class="flex justify-between text-[10px] text-slate-500 font-bold mb-1">
+                            <span>ZOOM</span>
+                        </div>
+                        <input type="range" min="1" max="3" step="0.1" value="1" oninput="Editor.setZoom(this.value)" class="w-full accent-cyan-500 h-2 bg-slate-900 rounded-lg appearance-none cursor-pointer">
+                    </div>
+                </div>
+
+                <div class="h-px bg-slate-700 my-1 w-full hidden md:block"></div>
+
+                <!-- Group 3: Generator & Clear -->
+                <div class="flex gap-2 w-full items-center">
+                    <!-- Editor Generator -->
+                    <div class="bg-slate-900 p-1 md:p-2 rounded border border-slate-700 flex-1 md:w-full">
+                        <div class="text-[10px] text-slate-500 font-bold mb-1 uppercase tracking-wider hidden md:block">Generator</div>
+                        <div class="flex gap-1 items-center">
+                            <div class="flex gap-1 flex-1">
+                                <input id="ed-code" type="text" placeholder="CODE" class="w-full bg-slate-800 border border-slate-600 text-white text-[10px] px-1 h-6 rounded uppercase">
+                                <button onclick="Utils.randomCode('ed-code')" class="bg-slate-700 text-slate-300 w-6 h-6 rounded flex items-center justify-center shrink-0"><i class="ph ph-dice-five"></i></button>
+                            </div>
+                            <select id="ed-size" class="bg-slate-800 text-slate-300 border border-slate-600 rounded text-[10px] h-6 px-1 w-12 md:w-16">
+                                <option value="11">10x</option>
+                                <option value="25" selected>25x</option>
+                                <option value="51">50x</option>
+                            </select>
+                            <button onclick="Editor.generateFromCode()" class="bg-cyan-700 text-white text-[10px] h-6 px-2 rounded font-bold">GEN</button>
+                        </div>
+                    </div>
+                    
+                    <button onclick="Editor.clear()" class="md:mt-auto border border-red-900 text-red-400 p-1 md:p-2 rounded text-[10px] md:text-xs hover:bg-red-900/20 font-bold h-full md:h-auto w-12 md:w-full flex flex-col items-center justify-center">
+                        <i class="ph ph-trash text-lg md:hidden"></i>
+                        <span class="hidden md:inline">CLEAR MAP</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Viewport -->
+            <div id="editor-viewport" class="flex-1 bg-slate-950 relative p-4 md:p-8 mode-draw overflow-hidden">
+                <div id="editor-grid"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Victory -->
+    <div id="screen-victory" class="ui-screen hidden bg-black/95 interactive items-center justify-center z-[100] text-center p-6">
+        <div class="max-w-sm w-full bg-slate-900 p-8 rounded-3xl border border-yellow-500/20 shadow-2xl">
+            <i class="ph ph-crown text-6xl text-yellow-400 mb-4 inline-block animate-bounce"></i>
+            <h2 class="text-4xl font-black text-white mb-2">COMPLETE!</h2>
+            <div class="text-2xl font-mono text-cyan-400 font-bold mb-6 bg-slate-950 p-2 rounded-lg border border-slate-800" id="victory-time">00:00</div>
+            <button onclick="Game.quit()" class="w-full bg-cyan-600 hover:bg-cyan-500 text-white py-4 rounded-xl font-bold shadow-lg transition">Main Menu</button>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * Maze Game with Seeds, Timer, and Random Generation
+         */
+
+        const CONST = {
+            WALL: 1, PATH: 0, START: 2, END: 3,
+            CELL_SIZE: 4, 
+            SPEED_3D: 0.05,
+            SPEED_2D: 0.15,
+            ROT_SPEED: 0.04,
+            COLLISION_RADIUS: 0.15 
+        };
+
+        // --- UTILS ---
+        const Utils = {
+            randomCode(inputId) {
+                const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // No I, 1, O, 0 to avoid confusion
+                let result = "";
+                for(let i=0; i<5; i++) {
+                    result += chars.charAt(Math.floor(Math.random() * chars.length));
+                }
+                document.getElementById(inputId).value = result;
+            }
+        };
+
+        // --- TIMER ---
+        const Timer = {
+            el: null, startTime: 0, interval: null, running: false,
+            init() { this.el = document.getElementById('game-timer'); },
+            start() {
+                this.running = true;
+                this.startTime = Date.now();
+                this.el.style.display = 'block';
+                this.update();
+                this.interval = setInterval(() => this.update(), 100);
+            },
+            stop() {
+                this.running = false;
+                clearInterval(this.interval);
+                return this.format(Date.now() - this.startTime);
+            },
+            reset() {
+                this.stop();
+                this.el.style.display = 'none';
+                this.el.innerText = '00:00';
+            },
+            update() {
+                const delta = Date.now() - this.startTime;
+                this.el.innerText = this.format(delta);
+            },
+            format(ms) {
+                const totalSecs = Math.floor(ms / 1000);
+                const m = Math.floor(totalSecs / 60).toString().padStart(2, '0');
+                const s = (totalSecs % 60).toString().padStart(2, '0');
+                // Optional: show tenths of seconds
+                // const ds = Math.floor((ms % 1000) / 100);
+                return `${m}:${s}`;
+            }
+        };
+
+        // --- PRNG (SEED SYSTEM) ---
+        const Seed = {
+            rng: Math.random, // Default to built-in random
+            current: null,
+
+            // Hash string to 32-bit integer
+            hash(str) {
+                let h = 0x811c9dc5;
+                for (let i = 0; i < str.length; i++) {
+                    h ^= str.charCodeAt(i);
+                    h = Math.imul(h, 0x01000193);
+                }
+                return h >>> 0;
+            },
+
+            // Mulberry32 Algorithm
+            mulberry32(a) {
+                return function() {
+                    var t = a += 0x6D2B79F5;
+                    t = Math.imul(t ^ t >>> 15, t | 1);
+                    t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+                    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+                }
+            },
+
+            set(code) {
+                if(!code) { this.reset(); return; }
+                const seedInt = this.hash(code);
+                this.rng = this.mulberry32(seedInt);
+                this.current = code;
+            },
+
+            reset() {
+                this.rng = Math.random;
+                this.current = null;
+            }
+        };
+
+        // --- JOYSTICK ---
+        class Joystick {
+            constructor(zoneId, thumbId, maxDist = 40) {
+                this.zone = document.getElementById(zoneId);
+                this.thumb = document.getElementById(thumbId);
+                this.maxDist = maxDist;
+                this.active = false;
+                this.data = { x: 0, y: 0 }; 
+                this.origin = { x: 0, y: 0 };
+                this.bindEvents();
+            }
+
+            bindEvents() {
+                const handleStart = (e) => {
+                    e.preventDefault();
+                    this.active = true;
+                    const rect = this.zone.getBoundingClientRect();
+                    this.origin = { x: rect.left + rect.width/2, y: rect.top + rect.height/2 };
+                    this.update(e);
+                    this.zone.querySelector('.stick-base').style.borderColor = "rgba(34, 211, 238, 0.5)";
+                };
+                const handleMove = (e) => { if(!this.active) return; e.preventDefault(); this.update(e); };
+                const handleEnd = (e) => {
+                    e.preventDefault(); this.active = false; this.data = {x:0, y:0};
+                    this.thumb.style.transform = `translate(-50%, -50%)`;
+                    this.zone.querySelector('.stick-base').style.borderColor = "";
+                };
+                this.zone.addEventListener('touchstart', handleStart, {passive: false});
+                this.zone.addEventListener('touchmove', handleMove, {passive: false});
+                this.zone.addEventListener('touchend', handleEnd);
+                this.zone.addEventListener('touchcancel', handleEnd);
+            }
+
+            update(e) {
+                const touch = e.targetTouches ? e.targetTouches[0] : e;
+                const dx = touch.clientX - this.origin.x;
+                const dy = touch.clientY - this.origin.y;
+                const dist = Math.sqrt(dx*dx + dy*dy);
+                const angle = Math.atan2(dy, dx);
+                const clamped = Math.min(dist, this.maxDist);
+                const tx = Math.cos(angle) * clamped;
+                const ty = Math.sin(angle) * clamped;
+                this.thumb.style.transform = `translate(calc(-50% + ${tx}px), calc(-50% + ${ty}px))`;
+                this.data.x = tx / this.maxDist;
+                this.data.y = ty / this.maxDist;
+            }
+        }
+
+        // --- INPUT ---
+        const Input = {
+            keys: { w:false, s:false, l:false, r:false },
+            stick: null,
+            initialized: false,
+            
+            init() {
+                if(this.initialized) return;
+                this.initialized = true;
+
+                const k = (e,v) => {
+                    const key = e.key.toLowerCase();
+                    if(key==='w'||key==='arrowup') this.keys.w=v;
+                    if(key==='s'||key==='arrowdown') this.keys.s=v;
+                    if(key==='a'||key==='arrowleft') this.keys.l=v;
+                    if(key==='d'||key==='arrowright') this.keys.r=v;
+                };
+                window.addEventListener('keydown', e=>k(e,true));
+                window.addEventListener('keyup', e=>k(e,false));
+
+                if('ontouchstart' in window || navigator.maxTouchPoints > 0) {
+                    this.stick = new Joystick('stick-zone', 'stick-thumb');
+                } else {
+                    document.getElementById('controls-hint').classList.remove('hidden');
+                }
+            },
+
+            get(mode3D) {
+                let dx = 0, dz = 0, rot = 0;
+
+                if (mode3D) {
+                    if(this.keys.w) dz = 1;
+                    if(this.keys.s) dz = -1;
+                    if(this.keys.l) rot = 1;
+                    if(this.keys.r) rot = -1;
+                } else {
+                    if(this.keys.w) dz = -1;
+                    if(this.keys.s) dz = 1;
+                    if(this.keys.l) dx = -1;
+                    if(this.keys.r) dx = 1;
+                }
+
+                if(this.stick && this.stick.active) {
+                    const sx = this.stick.data.x;
+                    const sy = this.stick.data.y;
+                    if(mode3D) { dz = -sy; rot = -sx; } 
+                    else { dx = sx; dz = sy; }
+                }
+                return { dx, dz, rot };
+            }
+        };
+
+        // --- MAZE ---
+        const MazeGen = {
+            // Added rng parameter for Seed support
+            generate(w, h, rng = Math.random) {
+                let map = Array(h).fill().map(() => Array(w).fill(CONST.WALL));
+                const stack = [];
+                let startX = 1; let startY = 1;
+                map[startY][startX] = CONST.PATH;
+                stack.push({x: startX, y: startY});
+                const dirs = [{x:0, y:-2}, {x:0, y:2}, {x:-2, y:0}, {x:2, y:0}];
+                while(stack.length > 0) {
+                    const current = stack[stack.length - 1];
+                    const neighbors = [];
+                    for(let d of dirs) {
+                        const nx = current.x + d.x;
+                        const ny = current.y + d.y;
+                        if(nx > 0 && nx < w-1 && ny > 0 && ny < h-1 && map[ny][nx] === CONST.WALL) {
+                            neighbors.push({x: nx, y: ny, dx: d.x/2, dy: d.y/2});
+                        }
+                    }
+                    if(neighbors.length > 0) {
+                        // Use the seeded rng() here
+                        const next = neighbors[Math.floor(rng() * neighbors.length)];
+                        map[next.y][next.x] = CONST.PATH;
+                        map[current.y + next.dy][current.x + next.dx] = CONST.PATH;
+                        stack.push({x: next.x, y: next.y});
+                    } else { stack.pop(); }
+                }
+                map[1][1] = CONST.START;
+                map[h-2][w-2] = CONST.END;
+                return map;
+            }
+        };
+
+        // --- GRAPHICS ---
+        const GFX = {
+            scene: null, camera: null, renderer: null, wallsMesh: null,
+            init() {
+                if(this.renderer) return;
+
+                const cvs = document.getElementById('c3d');
+                this.renderer = new THREE.WebGLRenderer({ canvas: cvs, antialias: false });
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                this.scene = new THREE.Scene();
+                this.scene.background = new THREE.Color(0x020617);
+                this.scene.fog = new THREE.Fog(0x020617, 2, 20);
+                this.camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.1, 100);
+                this.scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+                this.pl = new THREE.PointLight(0x38bdf8, 1.5, 12);
+                this.scene.add(this.pl);
+                window.addEventListener('resize', () => {
+                    this.camera.aspect = window.innerWidth / window.innerHeight;
+                    this.camera.updateProjectionMatrix();
+                    this.renderer.setSize(window.innerWidth, window.innerHeight);
+                });
+            },
+            build(map, w, h) {
+                if (!this.scene) this.init();
+
+                for(let i = this.scene.children.length - 1; i >= 0; i--) {
+                     const c = this.scene.children[i];
+                     if(!c.isLight && !c.isCamera) {
+                         this.scene.remove(c);
+                         if(c.geometry) c.geometry.dispose();
+                     }
+                }
+                this.wallsMesh = null;
+                
+                const floor = new THREE.Mesh(new THREE.PlaneGeometry(w*4, h*4), new THREE.MeshBasicMaterial({ color: 0x0f172a }));
+                floor.rotation.x = -Math.PI/2;
+                floor.position.set(w*2, -2, h*2); 
+                this.scene.add(floor);
+
+                const wallCount = map.flat().filter(c => c === CONST.WALL).length;
+                const geo = new THREE.BoxGeometry(4, 4, 4);
+                const mat = new THREE.MeshLambertMaterial({ color: 0x475569 });
+                this.wallsMesh = new THREE.InstancedMesh(geo, mat, wallCount);
+                
+                const dummy = new THREE.Object3D();
+                let idx = 0;
+                for(let z=0; z<h; z++) {
+                    for(let x=0; x<w; x++) {
+                        const t = map[z][x];
+                        const worldX = x * 4 + 2;
+                        const worldZ = z * 4 + 2;
+
+                        if(t === CONST.WALL) {
+                            dummy.position.set(worldX, 0, worldZ);
+                            dummy.updateMatrix();
+                            this.wallsMesh.setMatrixAt(idx++, dummy.matrix);
+                        } else if(t === CONST.END) {
+                            const orb = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 16), new THREE.MeshBasicMaterial({ color: 0xef4444 }));
+                            orb.position.set(worldX, 0, worldZ);
+                            this.scene.add(orb);
+                            const pl = new THREE.PointLight(0xff0000, 2, 8);
+                            pl.position.set(worldX, 0, worldZ);
+                            this.scene.add(pl);
+                        }
+                    }
+                }
+                this.scene.add(this.wallsMesh);
+            },
+            render(player) {
+                this.camera.position.set(player.x*4, 0, player.z*4);
+                const tx = this.camera.position.x - Math.sin(player.dir);
+                const tz = this.camera.position.z - Math.cos(player.dir);
+                this.camera.lookAt(tx, 0, tz);
+                this.pl.position.copy(this.camera.position);
+                this.renderer.render(this.scene, this.camera);
+            },
+            render2D(map, w, h, p, cvsId) {
+                const cvs = document.getElementById(cvsId);
+                const ctx = cvs.getContext('2d');
+                const isMini = cvsId === 'minimap';
+
+                if(!isMini) {
+                    if(cvs.width !== window.innerWidth) { cvs.width=window.innerWidth; cvs.height=window.innerHeight; }
+                    ctx.fillStyle = '#020617'; ctx.fillRect(0,0,cvs.width,cvs.height);
+                } else {
+                    cvs.width=140; cvs.height=140;
+                    ctx.fillStyle = "rgba(15, 23, 42, 0.95)"; ctx.fillRect(0,0,140,140);
+                }
+
+                const pad = isMini ? 0 : 40;
+                const sw = cvs.width-pad; const sh = cvs.height-pad;
+                const scale = Math.min(sw/w, sh/h);
+                const ox = (cvs.width - w*scale)/2;
+                const oy = (cvs.height - h*scale)/2;
+
+                for(let z=0; z<h; z++) for(let x=0; x<w; x++) {
+                    const t = map[z][x];
+                    if(isMini && t!==CONST.WALL && t!==CONST.END) continue;
+                    this.drawCell(ctx, t, ox+x*scale, oy+z*scale, scale);
+                }
+
+                const px = ox + p.x*scale;
+                const py = oy + p.z*scale;
+                ctx.save();
+                ctx.translate(px, py);
+                if(isMini) ctx.rotate(-p.dir); 
+                else ctx.rotate(p.dir); 
+                
+                ctx.fillStyle = '#fbbf24';
+                ctx.beginPath();
+                ctx.moveTo(0, -scale*0.7);
+                ctx.lineTo(scale*0.4, scale*0.5);
+                ctx.lineTo(0, scale*0.3);
+                ctx.lineTo(-scale*0.4, scale*0.5);
+                ctx.fill();
+                ctx.restore();
+            },
+            drawCell(ctx, t, x, y, s) {
+                if(t===CONST.WALL) ctx.fillStyle = '#475569';
+                else if(t===CONST.END) ctx.fillStyle = '#ef4444';
+                else if(t===CONST.START) ctx.fillStyle = '#10b981';
+                else if(t===CONST.PATH && ctx.canvas.id !== 'minimap') ctx.fillStyle = '#0f172a';
+                else return;
+                ctx.fillRect(x,y,s+0.5,s+0.5);
+            }
+        };
+
+        // --- GAME ---
+        const Game = {
+            running: false, mode3D: true,
+            map: [], w: 0, h: 0,
+            player: { x:1, z:1, dir: Math.PI },
+
+            init() {
+                Input.init(); GFX.init(); Timer.init(); this.loop();
+                document.getElementById('inp-code').addEventListener('keyup', (e)=>{
+                    if(e.key === 'Enter') this.start('code');
+                });
+            },
+            start(mode) {
+                if (!GFX.scene) this.init(); 
+
+                let w=15, h=15;
+                let rng = Math.random;
+
+                // Reset timer for new game
+                Timer.reset();
+
+                if (mode === 'code') {
+                    // SEED LOGIC
+                    const rawCode = document.getElementById('inp-code').value.trim();
+                    const sizeVal = parseInt(document.getElementById('inp-size').value);
+                    if(!rawCode) return alert("Please enter a code!");
+                    const code = rawCode.toUpperCase();
+                    Seed.set(code);
+                    rng = Seed.rng;
+                    w = sizeVal; h = sizeVal;
+                    
+                    document.getElementById('ui-code-display').classList.remove('hidden');
+                    document.getElementById('ui-code-val').innerText = `${code} (${w}x${h})`;
+                } else {
+                    // REGULAR LOGIC
+                    Seed.reset();
+                    document.getElementById('ui-code-display').classList.add('hidden');
+                    
+                    if(mode==='easy'){w=11;h=11;} 
+                    if(mode==='medium'){w=25;h=25;} 
+                    if(mode==='hard'){w=51;h=51;}
+                }
+
+                if(mode==='custom') { 
+                    this.map=JSON.parse(JSON.stringify(Editor.grid)); 
+                    this.w=this.map[0].length; this.h=this.map.length; 
+                } else { 
+                    this.map = MazeGen.generate(w, h, rng); 
+                    this.w=w; this.h=h; 
+                }
+
+                let found=false;
+                for(let z=0;z<this.h;z++) for(let x=0;x<this.w;x++) if(this.map[z][x]===CONST.START) { this.player.x=x+0.5; this.player.z=z+0.5; found=true; }
+                if(!found){this.player.x=1.5;this.player.z=1.5;}
+                this.player.dir = Math.PI;
+
+                GFX.build(this.map, this.w, this.h);
+                document.querySelectorAll('.ui-screen').forEach(e => e.classList.add('hidden'));
+                document.getElementById('screen-game').classList.remove('hidden');
+                document.getElementById('screen-game').classList.add('flex');
+                
+                this.mode3D=true; this.running=true;
+                Timer.start(); // Start timing!
+                this.updateUI();
+            },
+            toggleView() { this.mode3D=!this.mode3D; this.updateUI(); },
+            updateUI() {
+                const isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+                document.getElementById('c3d').style.display = this.mode3D ? 'block' : 'none';
+                document.getElementById('c2d').style.display = this.mode3D ? 'none' : 'block';
+                document.getElementById('minimap-wrapper').style.display = this.mode3D ? 'block' : 'none';
+                document.getElementById('lbl-view').innerText = this.mode3D ? "2D Map" : "3D View";
+                document.getElementById('controls-ui').style.display = isMobile ? 'block' : 'none';
+            },
+            loop() {
+                requestAnimationFrame(()=>this.loop());
+                if(!this.running) return;
+
+                const input = Input.get(this.mode3D);
+                if(this.mode3D) {
+                    this.player.dir += input.rot * CONST.ROT_SPEED;
+                    if(Math.abs(input.dz) > 0.05) {
+                        const speed = input.dz * CONST.SPEED_3D;
+                        const dx = -Math.sin(this.player.dir) * speed;
+                        const dz = -Math.cos(this.player.dir) * speed;
+                        this.move(dx, dz);
+                    }
+                } else {
+                    if(Math.abs(input.dx)>0.05 || Math.abs(input.dz)>0.05) {
+                        const dx = input.dx * CONST.SPEED_2D;
+                        const dz = input.dz * CONST.SPEED_2D;
+                        this.move(dx, dz);
+                        if(dx!==0 || dz!==0) this.player.dir = Math.atan2(dx, -dz);
+                    }
+                }
+
+                const gx=Math.floor(this.player.x), gz=Math.floor(this.player.z);
+                if(this.map[gz][gx]===CONST.END) {
+                    this.running=false;
+                    const finalTime = Timer.stop(); // Stop timing
+                    document.getElementById('victory-time').innerText = finalTime;
+                    document.getElementById('screen-victory').classList.remove('hidden');
+                    document.getElementById('screen-victory').classList.add('flex');
+                    document.getElementById('minimap-wrapper').style.display='none';
+                    document.getElementById('controls-ui').style.display='none';
+                }
+
+                if(this.mode3D) { GFX.render(this.player); GFX.render2D(this.map, this.w, this.h, this.player, 'minimap'); }
+                else GFX.render2D(this.map, this.w, this.h, this.player, 'c2d');
+            },
+            move(dx, dz) {
+                if(!this.col(this.player.x+dx, this.player.z)) this.player.x+=dx;
+                if(!this.col(this.player.x, this.player.z+dz)) this.player.z+=dz;
+            },
+            col(x, z) {
+                const r = CONST.COLLISION_RADIUS;
+                const minX=Math.floor(x-r), maxX=Math.floor(x+r), minZ=Math.floor(z-r), maxZ=Math.floor(z+r);
+                for(let cz=minZ; cz<=maxZ; cz++) for(let cx=minX; cx<=maxX; cx++) {
+                    if(cz<0||cz>=this.h||cx<0||cx>=this.w) return true;
+                    if(this.map[cz][cx]===CONST.WALL) return true;
+                }
+                return false;
+            },
+            quit() {
+                this.running=false;
+                Timer.reset();
+                document.querySelectorAll('.ui-screen').forEach(e => e.classList.add('hidden'));
+                document.getElementById('screen-menu').classList.remove('hidden');
+                document.getElementById('minimap-wrapper').style.display='none';
+                document.getElementById('controls-ui').style.display='none';
+            }
+        };
+
+        // --- EDITOR ---
+        const Editor = {
+            grid: [], size: 10, tool: 1, isDrawing: false, zoom: 1.0, mode: 'draw',
+            
+            open() {
+                // Initial grid if not exists
+                if(this.grid.length === 0) this.resize(this.size);
+
+                document.getElementById('screen-menu').classList.add('hidden');
+                document.getElementById('screen-editor').classList.remove('hidden');
+                document.getElementById('screen-editor').classList.add('flex');
+                setTimeout(()=>this.render(), 10);
+
+                const vp = document.getElementById('editor-grid');
+                const handleStart = (e) => {
+                    if(this.mode === 'pan') return; 
+                    e.preventDefault();
+                    this.isDrawing = true; this.handleInput(e);
+                    vp.setPointerCapture(e.pointerId);
+                };
+                const handleMove = (e) => {
+                    if(this.mode === 'pan') return;
+                    e.preventDefault();
+                    if(this.isDrawing) this.handleInput(e);
+                };
+                vp.onpointerdown = handleStart;
+                vp.onpointermove = handleMove;
+                vp.onpointerup = () => this.isDrawing = false;
+            },
+            close() {
+                document.getElementById('screen-editor').classList.add('hidden');
+                document.getElementById('screen-menu').classList.remove('hidden');
+            },
+            generateFromCode() {
+                const code = document.getElementById('ed-code').value.trim();
+                const size = parseInt(document.getElementById('ed-size').value);
+                if(!code) return alert("Please enter a code");
+                
+                Seed.set(code.toUpperCase());
+                this.grid = MazeGen.generate(size, size, Seed.rng);
+                this.size = size;
+                document.getElementById('lbl-size').innerText = `${this.size}x`;
+                Seed.reset(); // Reset global seed so normal games aren't affected unless specified
+                this.render();
+            },
+            setTool(t) { this.tool = t; this.updateUI(); },
+            setMode(m) { 
+                this.mode = m; 
+                document.getElementById('editor-viewport').className = `flex-1 bg-slate-950 relative p-4 md:p-8 mode-${m} overflow-hidden`;
+                this.updateUI();
+            },
+            updateUI() {
+                document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('border-cyan-400', 'bg-slate-600'));
+                document.getElementById('t-'+this.tool).classList.add('border-cyan-400', 'bg-slate-600');
+                
+                document.getElementById('btn-mode-draw').className = `flex-1 rounded transition flex justify-center items-center text-xs font-bold ${this.mode==='draw'?'bg-cyan-700 text-white':'text-slate-400 hover:text-white'}`;
+                document.getElementById('btn-mode-pan').className = `flex-1 rounded transition flex justify-center items-center text-xs font-bold ${this.mode==='pan'?'bg-cyan-700 text-white':'text-slate-400 hover:text-white'}`;
+            },
+            resize(v) { 
+                this.size = parseInt(v); 
+                document.getElementById('lbl-size').innerText = `${this.size}x`; 
+                this.grid = Array(this.size).fill().map((_,y)=>Array(this.size).fill().map((_,x)=>(x===0||y===0||x===this.size-1||y===this.size-1)?1:0));
+                this.render(); 
+            },
+            setZoom(v) { this.zoom = parseFloat(v); this.render(); },
+            clear() { this.resize(this.size); },
+            handleInput(e) {
+                const el = document.elementFromPoint(e.clientX, e.clientY);
+                if(el && el.dataset.x) this.paint(parseInt(el.dataset.x), parseInt(el.dataset.y), el);
+            },
+            paint(x, y, el) {
+                if(this.tool===2||this.tool===3) {
+                    this.grid.forEach((r,ry)=>r.forEach((_,rx)=>{ if(this.grid[ry][rx]===this.tool) { this.grid[ry][rx]=0; this.updateCell(rx,ry,0); } }));
+                }
+                this.grid[y][x] = this.tool;
+                el.className = `grid-cell ${this.getClass(this.tool)}`;
+            },
+            updateCell(x, y, type) {
+                const idx = y*this.size + x;
+                const gridEl = document.getElementById('editor-grid');
+                if(gridEl.children[idx]) gridEl.children[idx].className = `grid-cell ${this.getClass(type)}`;
+            },
+            getClass(t) { return t===1?'c-wall':t===2?'c-start':t===3?'c-end':'c-path'; },
+            render() {
+                const el = document.getElementById('editor-grid');
+                const viewport = document.getElementById('editor-viewport');
+                el.innerHTML = '';
+                
+                const pad = 32; 
+                const availW = viewport.clientWidth - pad;
+                const availH = viewport.clientHeight - pad;
+                const baseSize = Math.floor(Math.min(availW, availH) / this.size);
+                const cellSize = Math.floor(baseSize * this.zoom);
+
+                el.style.gridTemplateColumns = `repeat(${this.size}, ${cellSize}px)`;
+                el.style.width = 'fit-content'; 
+                
+                const frag = document.createDocumentFragment();
+                for(let y=0; y<this.size; y++) for(let x=0; x<this.size; x++) {
+                    const d = document.createElement('div');
+                    d.style.width = `${cellSize}px`;
+                    d.style.height = `${cellSize}px`;
+                    d.className = `grid-cell ${this.getClass(this.grid[y][x])}`;
+                    d.dataset.x = x; d.dataset.y = y;
+                    frag.appendChild(d);
+                }
+                el.appendChild(frag);
+            }
+        };
+
+        window.onload = () => Game.init();
+    </script>
+</body>
+</html>
