@@ -135,6 +135,14 @@
             color: #94a3b8;
         }
         
+        /* Menu Focus Ring for Keyboard Navigation */
+        .menu-focus {
+            outline: 2px solid #22d3ee;
+            outline-offset: 2px;
+            transform: scale(1.02);
+            background-color: rgb(30 41 59) !important; /* slate-800 */
+        }
+        
         /* Custom Scrollbar for editor panel */
         .custom-scroll::-webkit-scrollbar { width: 6px; }
         .custom-scroll::-webkit-scrollbar-track { background: #0f172a; }
@@ -168,26 +176,34 @@
     <!-- Desktop Hint -->
     <div id="controls-hint" class="ui-screen hidden md:flex justify-end items-end p-8 z-10 pointer-events-none">
         <div class="bg-slate-900/80 backdrop-blur p-4 rounded-xl border border-white/10 text-slate-400 text-sm font-mono flex flex-col gap-2">
-            <div class="flex items-center gap-4"><span class="bg-slate-700 px-2 rounded text-white">WASD</span> <span>Move</span></div>
-            <div class="flex items-center gap-4"><span class="bg-slate-700 px-2 rounded text-white">M</span> <span>Map</span></div>
-            <div class="flex items-center gap-4"><span class="bg-slate-700 px-2 rounded text-white">V</span> <span>View</span></div>
+            <div class="flex items-center gap-4"><span class="bg-slate-700 px-2 rounded text-white">WASD</span> <span data-i18n="hint_move">Move</span></div>
+            <div class="flex items-center gap-4"><span class="bg-slate-700 px-2 rounded text-white">M</span> <span data-i18n="hint_map">Map</span></div>
+            <div class="flex items-center gap-4"><span class="bg-slate-700 px-2 rounded text-white">V</span> <span data-i18n="hint_view">View</span></div>
+            <div class="flex items-center gap-4"><span class="bg-slate-700 px-2 rounded text-white">ESC</span> <span data-i18n="main_menu">Main Menu</span></div>
         </div>
     </div>
 
     <!-- Main Menu -->
     <div id="screen-menu" class="ui-screen interactive bg-slate-950/95 flex items-center justify-center overflow-y-auto">
+        <!-- Language Toggle -->
+        <button onclick="Lang.toggle()" class="absolute top-6 right-6 bg-slate-800 text-slate-400 hover:text-white px-3 py-1 rounded-lg font-bold text-xs border border-slate-700 flex items-center gap-2">
+            <i class="ph ph-globe"></i> <span id="lbl-lang">EN</span>
+        </button>
+
         <div class="text-center max-w-md w-full p-6 my-auto">
             <h1 class="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-600 mb-2">MAZEMAZING</h1>
-            <p class="text-slate-500 mb-8 font-mono text-sm">3D / 2D Engine • Pro</p>
+            <p class="text-slate-500 mb-8 font-mono text-sm" data-i18n="subtitle">3D / 2D Engine • Pro</p>
 
-            <div class="space-y-3">
-                <button onclick="Game.start('easy')" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-4 rounded-xl font-bold shadow-lg transition transform active:scale-95">Easy (10x10)</button>
-                <button onclick="Game.start('medium')" class="w-full bg-amber-600 hover:bg-amber-500 text-white py-4 rounded-xl font-bold shadow-lg transition transform active:scale-95">Medium (25x25)</button>
-                <button onclick="Game.start('hard')" class="w-full bg-rose-600 hover:bg-rose-500 text-white py-4 rounded-xl font-bold shadow-lg transition transform active:scale-95 border border-rose-400/30">Hard (50x50)</button>
+            <div class="space-y-3" id="menu-list">
+                <button data-nav="true" onclick="Game.start('easy')" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-4 rounded-xl font-bold shadow-lg transition transform active:scale-95 border-2 border-transparent" data-i18n="easy">Easy (10x10)</button>
+                <button data-nav="true" onclick="Game.start('medium')" class="w-full bg-amber-600 hover:bg-amber-500 text-white py-4 rounded-xl font-bold shadow-lg transition transform active:scale-95 border-2 border-transparent" data-i18n="medium">Medium (25x25)</button>
+                <button data-nav="true" onclick="Game.start('hard')" class="w-full bg-rose-600 hover:bg-rose-500 text-white py-4 rounded-xl font-bold shadow-lg transition transform active:scale-95 border-2 border-transparent" data-i18n="hard">Hard (50x50)</button>
+                <!-- EXTREME MODE BUTTON -->
+                <button data-nav="true" onclick="Game.start('extreme')" class="w-full bg-purple-700 hover:bg-purple-600 text-white py-4 rounded-xl font-bold shadow-lg transition transform active:scale-95 border-2 border-transparent ring-1 ring-purple-400/50" data-i18n="extreme">Extreme (100x100)</button>
                 
                 <div class="relative py-4 flex items-center">
                     <div class="flex-grow border-t border-slate-800"></div>
-                    <span class="flex-shrink-0 mx-4 text-slate-600 text-xs font-bold">OR USE A CODE</span>
+                    <span class="flex-shrink-0 mx-4 text-slate-600 text-xs font-bold" data-i18n="code_label">OR USE A CODE</span>
                     <div class="flex-grow border-t border-slate-800"></div>
                 </div>
 
@@ -204,21 +220,22 @@
                              <option value="11">SMALL (10x10)</option>
                              <option value="25" selected>MEDIUM (25x25)</option>
                              <option value="51">LARGE (50x50)</option>
+                             <option value="101">EXTREME (100x100)</option>
                          </select>
-                         <button onclick="Game.start('code')" class="flex-1 h-10 bg-cyan-700 hover:bg-cyan-600 text-white rounded-lg font-bold shadow-lg transition transform active:scale-95 text-sm">
+                         <button onclick="Game.start('code')" class="flex-1 h-10 bg-cyan-700 hover:bg-cyan-600 text-white rounded-lg font-bold shadow-lg transition transform active:scale-95 text-sm" data-i18n="load_map">
                              LOAD MAP
                          </button>
                     </div>
                 </div>
 
                 <div class="h-4"></div>
-                <button onclick="Editor.open()" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 py-3 rounded-xl font-bold shadow-lg flex items-center justify-center gap-2">
-                    <i class="ph ph-pencil-simple"></i> Map Editor
+                <button data-nav="true" onclick="Editor.open()" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 py-3 rounded-xl font-bold shadow-lg flex items-center justify-center gap-2 border-2 border-transparent transition">
+                    <i class="ph ph-pencil-simple"></i> <span data-i18n="map_editor">Map Editor</span>
                 </button>
                 
                 <div class="flex justify-center mt-4">
                     <button onclick="Sfx.toggle()" class="text-slate-500 hover:text-white transition flex items-center gap-2 text-sm font-bold">
-                        <i id="icon-sound" class="ph ph-speaker-high text-lg"></i> <span id="txt-sound">Sound On</span>
+                        <i id="icon-sound" class="ph ph-speaker-high text-lg"></i> <span id="txt-sound" data-i18n="sound_on">Sound On</span>
                     </button>
                 </div>
             </div>
@@ -231,7 +248,7 @@
             <!-- Top Left: Exit & Code Info -->
             <div class="flex flex-col md:flex-row md:items-center gap-2 md:gap-4">
                 <button onclick="Game.quit()" class="bg-red-950/80 backdrop-blur text-red-200 border border-red-900/50 px-3 py-2 rounded-lg font-bold shadow-lg text-sm transition active:scale-95 flex items-center gap-2 btn-game-ui w-fit">
-                    <i class="ph ph-sign-out text-lg"></i><span>Exit</span>
+                    <i class="ph ph-sign-out text-lg"></i><span data-i18n="exit">Exit</span>
                 </button>
                  <div id="ui-code-display" class="hidden bg-slate-900/60 backdrop-blur text-slate-400 border border-slate-800 px-3 py-2 rounded-lg text-xs font-mono shadow-md whitespace-nowrap w-fit">
                     <span class="opacity-50 mr-1">MAP:</span> <span class="text-cyan-400 font-bold tracking-wider" id="ui-code-val">---</span>
@@ -244,11 +261,11 @@
                 <div class="flex gap-2">
                     <!-- 2D/3D Toggle -->
                     <button onclick="Game.toggleDimension()" class="bg-slate-900/80 backdrop-blur text-cyan-400 border border-cyan-900/50 px-3 py-2 rounded-lg font-bold shadow-lg flex items-center gap-2 text-sm transition active:scale-95 btn-game-ui">
-                        <i id="icon-dim" class="ph ph-cube text-lg"></i> <span id="lbl-dim">3D View</span> <span class="key-badge hidden md:inline">M</span>
+                        <i id="icon-dim" class="ph ph-cube text-lg"></i> <span id="lbl-dim" data-i18n="view_3d">3D View</span> <span class="key-badge hidden md:inline">M</span>
                     </button>
                     <!-- POV Toggle (1st/3rd) -->
                     <button id="btn-pov" onclick="Game.toggleCamera()" class="bg-slate-900/80 backdrop-blur text-emerald-400 border border-emerald-900/50 px-3 py-2 rounded-lg font-bold shadow-lg flex items-center gap-2 text-sm transition active:scale-95 btn-game-ui">
-                        <i id="icon-pov" class="ph ph-person text-lg"></i> <span id="lbl-pov">3rd Person</span> <span class="key-badge hidden md:inline">V</span>
+                        <i id="icon-pov" class="ph ph-person text-lg"></i> <span id="lbl-pov" data-i18n="view_3rd">3rd Person</span> <span class="key-badge hidden md:inline">V</span>
                     </button>
                 </div>
 
@@ -268,16 +285,16 @@
                     <i class="ph ph-pencil-simple-line text-xl"></i>
                 </div>
                 <div>
-                    <h2 class="font-bold text-slate-100 text-lg leading-tight flex items-center gap-2"><i class="ph ph-pencil-simple-line md:hidden text-cyan-400"></i> Map Editor</h2>
+                    <h2 class="font-bold text-slate-100 text-lg leading-tight flex items-center gap-2"><i class="ph ph-pencil-simple-line md:hidden text-cyan-400"></i> <span data-i18n="map_editor">Map Editor</span></h2>
                     <p class="text-xs text-slate-500 font-mono hidden md:block">DESIGN MODE</p>
                 </div>
             </div>
             <div class="flex gap-3">
                 <button onclick="Editor.close()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white px-4 py-2 rounded-lg font-bold text-sm transition border border-slate-700">
-                    Exit
+                    <span data-i18n="back">Back</span>
                 </button>
                 <button onclick="Game.start('custom')" class="bg-green-600 hover:bg-green-500 text-white px-5 py-2 rounded-lg font-bold shadow-lg flex items-center gap-2 text-sm transition transform active:scale-95">
-                    <i class="ph ph-play-circle text-lg"></i> Play
+                    <i class="ph ph-play-circle text-lg"></i> <span data-i18n="play">Play</span>
                 </button>
             </div>
         </div>
@@ -295,10 +312,10 @@
                             <h3 class="text-[10px] md:text-xs font-bold text-slate-500 uppercase tracking-wider hidden md:block">Mode</h3>
                             <div class="flex bg-slate-950 p-1 rounded-lg border border-slate-800">
                                 <button onclick="Editor.setMode('draw')" id="btn-mode-draw" class="flex-1 py-1 md:py-2 rounded-md transition flex justify-center items-center text-[10px] md:text-xs font-bold gap-2">
-                                    <i class="ph ph-pencil-simple text-sm md:text-lg"></i> <span class="hidden sm:inline">DRAW</span>
+                                    <i class="ph ph-pencil-simple text-sm md:text-lg"></i> <span class="hidden sm:inline" data-i18n="draw">DRAW</span>
                                 </button>
                                 <button onclick="Editor.setMode('pan')" id="btn-mode-pan" class="flex-1 py-1 md:py-2 rounded-md transition flex justify-center items-center text-[10px] md:text-xs font-bold gap-2">
-                                    <i class="ph ph-hand-grabbing text-sm md:text-lg"></i> <span class="hidden sm:inline">PAN</span>
+                                    <i class="ph ph-hand-grabbing text-sm md:text-lg"></i> <span class="hidden sm:inline" data-i18n="pan">PAN</span>
                                 </button>
                             </div>
                         </div>
@@ -309,19 +326,19 @@
                              <div class="grid grid-cols-4 md:grid-cols-2 gap-1 md:gap-2 h-full">
                                  <button onclick="Editor.setTool(1)" id="t-1" class="tool-btn h-12 md:h-20 bg-slate-800 hover:bg-slate-700 rounded-lg border-2 border-transparent transition flex flex-col items-center justify-center gap-1 md:gap-2 group">
                                     <div class="w-4 h-4 md:w-8 md:h-8 bg-slate-500 border border-slate-400 rounded group-hover:scale-110 transition"></div>
-                                    <span class="text-[9px] md:text-xs font-bold text-slate-400 group-hover:text-white hidden md:block">Wall</span>
+                                    <span class="text-[9px] md:text-xs font-bold text-slate-400 group-hover:text-white hidden md:block" data-i18n="wall">Wall</span>
                                  </button>
                                  <button onclick="Editor.setTool(0)" id="t-0" class="tool-btn h-12 md:h-20 bg-slate-800 hover:bg-slate-700 rounded-lg border-2 border-transparent transition flex flex-col items-center justify-center gap-1 md:gap-2 group">
                                     <div class="w-4 h-4 md:w-8 md:h-8 bg-slate-950 border border-slate-600 rounded group-hover:scale-110 transition"></div>
-                                    <span class="text-[9px] md:text-xs font-bold text-slate-400 group-hover:text-white hidden md:block">Path</span>
+                                    <span class="text-[9px] md:text-xs font-bold text-slate-400 group-hover:text-white hidden md:block" data-i18n="path">Path</span>
                                  </button>
                                  <button onclick="Editor.setTool(2)" id="t-2" class="tool-btn h-12 md:h-20 bg-slate-800 hover:bg-slate-700 rounded-lg border-2 border-transparent transition flex flex-col items-center justify-center gap-1 md:gap-2 group">
                                     <div class="w-4 h-4 md:w-8 md:h-8 bg-emerald-500 rounded-full group-hover:scale-110 transition"></div>
-                                    <span class="text-[9px] md:text-xs font-bold text-slate-400 group-hover:text-white hidden md:block">Start</span>
+                                    <span class="text-[9px] md:text-xs font-bold text-slate-400 group-hover:text-white hidden md:block" data-i18n="start">Start</span>
                                  </button>
                                  <button onclick="Editor.setTool(3)" id="t-3" class="tool-btn h-12 md:h-20 bg-slate-800 hover:bg-slate-700 rounded-lg border-2 border-transparent transition flex flex-col items-center justify-center gap-1 md:gap-2 group">
                                     <div class="w-4 h-4 md:w-8 md:h-8 bg-red-500 rounded-full shadow-[0_0_8px_red] group-hover:scale-110 transition"></div>
-                                    <span class="text-[9px] md:text-xs font-bold text-slate-400 group-hover:text-white hidden md:block">End</span>
+                                    <span class="text-[9px] md:text-xs font-bold text-slate-400 group-hover:text-white hidden md:block" data-i18n="end">End</span>
                                  </button>
                              </div>
                         </div>
@@ -338,14 +355,14 @@
                             
                             <div class="space-y-1">
                                 <div class="flex justify-between text-[10px] md:text-xs text-slate-400">
-                                    <span>Grid Size</span> <span id="lbl-size" class="font-mono text-cyan-400">10x</span>
+                                    <span data-i18n="prop_grid">Grid Size</span> <span id="lbl-size" class="font-mono text-cyan-400">10x</span>
                                 </div>
-                                <input type="range" min="10" max="50" step="5" value="10" onchange="Editor.resize(this.value)" class="w-full accent-cyan-500 h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer">
+                                <input type="range" min="10" max="100" step="5" value="10" onchange="Editor.resize(this.value)" class="w-full accent-cyan-500 h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer">
                             </div>
 
                             <div class="space-y-1">
                                 <div class="flex justify-between text-[10px] md:text-xs text-slate-400">
-                                    <span>Zoom Level</span>
+                                    <span data-i18n="prop_zoom">Zoom Level</span>
                                 </div>
                                 <input type="range" min="0.5" max="3" step="0.1" value="1" oninput="Editor.setZoom(this.value)" class="w-full accent-cyan-500 h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer">
                             </div>
@@ -353,7 +370,7 @@
 
                         <!-- Generator Section -->
                         <div class="bg-slate-950 p-2 md:p-3 rounded-xl border border-slate-800 space-y-2 md:space-y-3">
-                            <h3 class="text-[10px] md:text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2"><i class="ph ph-magic-wand"></i> <span class="hidden sm:inline">Generator</span></h3>
+                            <h3 class="text-[10px] md:text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2"><i class="ph ph-magic-wand"></i> <span class="hidden sm:inline" data-i18n="gen_title">Generator</span></h3>
                             
                             <div class="flex gap-2">
                                 <div class="relative flex-1">
@@ -364,13 +381,14 @@
                                     <option value="11">10x</option>
                                     <option value="25" selected>25x</option>
                                     <option value="51">50x</option>
+                                    <option value="101">100x</option>
                                 </select>
                             </div>
-                            <button onclick="Editor.generateFromCode()" class="w-full bg-cyan-700 hover:bg-cyan-600 text-white text-[10px] md:text-xs h-6 md:h-8 rounded font-bold transition">GEN</button>
+                            <button onclick="Editor.generateFromCode()" class="w-full bg-cyan-700 hover:bg-cyan-600 text-white text-[10px] md:text-xs h-6 md:h-8 rounded font-bold transition" data-i18n="gen">GEN</button>
                         </div>
 
                         <button onclick="Editor.clear()" class="w-full border border-red-900/50 text-red-400 hover:bg-red-900/20 py-2 md:py-3 rounded-lg text-[10px] md:text-xs font-bold flex items-center justify-center gap-2 transition">
-                            <i class="ph ph-trash text-sm md:text-lg"></i> <span class="hidden sm:inline">CLEAR MAP</span>
+                            <i class="ph ph-trash text-sm md:text-lg"></i> <span class="hidden sm:inline" data-i18n="clear">CLEAR MAP</span>
                         </button>
                     </div>
                 </div>
@@ -387,9 +405,9 @@
     <div id="screen-victory" class="ui-screen hidden bg-black/95 interactive items-center justify-center z-[100] text-center p-6">
         <div class="max-w-sm w-full bg-slate-900 p-8 rounded-3xl border border-yellow-500/20 shadow-2xl">
             <i class="ph ph-crown text-6xl text-yellow-400 mb-4 inline-block animate-bounce"></i>
-            <h2 class="text-4xl font-black text-white mb-2">COMPLETE!</h2>
+            <h2 class="text-4xl font-black text-white mb-2" data-i18n="complete">COMPLETE!</h2>
             <div class="text-2xl font-mono text-cyan-400 font-bold mb-6 bg-slate-950 p-2 rounded-lg border border-slate-800" id="victory-time">00:00</div>
-            <button onclick="Game.quit()" class="w-full bg-cyan-600 hover:bg-cyan-500 text-white py-4 rounded-xl font-bold shadow-lg transition">Main Menu</button>
+            <button onclick="Game.quit()" class="w-full bg-cyan-600 hover:bg-cyan-500 text-white py-4 rounded-xl font-bold shadow-lg transition" data-i18n="main_menu">Main Menu</button>
         </div>
     </div>
 
@@ -404,10 +422,55 @@
         const CONST = {
             WALL: 1, PATH: 0, START: 2, END: 3,
             CELL_SIZE: 4, 
-            SPEED_3D: 0.05, // REVERTED TO SLOWER SPEED
+            SPEED_3D: 0.05, 
             SPEED_2D: 0.15,
             ROT_SPEED: 0.04, 
             COLLISION_RADIUS: 0.2
+        };
+
+        // --- LANGUAGE SYSTEM (EN/TR) ---
+        const Lang = {
+            current: 'en',
+            data: {
+                en: {
+                    title: "MAZEMAZING", subtitle: "3D / 2D Engine • Pro",
+                    easy: "Easy (10x10)", medium: "Medium (25x25)", hard: "Hard (50x50)", extreme: "Extreme (100x100)",
+                    code_label: "OR USE A CODE", load_map: "LOAD MAP", map_editor: "Map Editor",
+                    sound_on: "Sound On", sound_off: "Sound Off",
+                    exit: "Exit", view_3d: "3D View", view_2d: "2D Map", view_3rd: "3rd Person",
+                    back: "Back", play: "Play", draw: "DRAW", pan: "PAN",
+                    wall: "Wall", path: "Path", start: "Start", end: "End",
+                    prop_grid: "Grid Size", prop_zoom: "Zoom Level", gen_title: "Generator", gen: "GEN", clear: "CLEAR MAP",
+                    complete: "COMPLETE!", main_menu: "Main Menu", hint_move: "Move", hint_map: "Map", hint_view: "View"
+                },
+                tr: {
+                    title: "MAZEMAZING", subtitle: "3D / 2D Motoru • Pro",
+                    easy: "Kolay (10x10)", medium: "Orta (25x25)", hard: "Zor (50x50)", extreme: "Ekstrem (100x100)",
+                    code_label: "VEYA KOD KULLAN", load_map: "HARİTA YÜKLE", map_editor: "Harita Editörü",
+                    sound_on: "Ses Açık", sound_off: "Ses Kapalı",
+                    exit: "Çıkış", view_3d: "3D Görünüm", view_2d: "2D Harita", view_3rd: "3. Şahıs",
+                    back: "Geri", play: "Oyna", draw: "ÇİZ", pan: "KAYDIR",
+                    wall: "Duvar", path: "Yol", start: "Başla", end: "Bitiş",
+                    prop_grid: "Izgara Boyutu", prop_zoom: "Yakınlaştırma", gen_title: "Oluşturucu", gen: "ÜRET", clear: "TEMİZLE",
+                    complete: "TAMAMLANDI!", main_menu: "Ana Menü", hint_move: "Hareket", hint_map: "Harita", hint_view: "Görünüm"
+                }
+            },
+            toggle() {
+                this.current = this.current === 'en' ? 'tr' : 'en';
+                this.apply();
+            },
+            apply() {
+                const dict = this.data[this.current];
+                document.getElementById('lbl-lang').innerText = this.current.toUpperCase();
+                document.querySelectorAll('[data-i18n]').forEach(el => {
+                    const key = el.getAttribute('data-i18n');
+                    if(dict[key]) el.innerText = dict[key];
+                });
+                // Update sound text manually if needed
+                const sfxText = Sfx.enabled ? dict.sound_on : dict.sound_off;
+                document.getElementById('txt-sound').innerText = sfxText;
+            },
+            get(key) { return this.data[this.current][key] || key; }
         };
 
         const Utils = {
@@ -416,6 +479,35 @@
                 let result = "";
                 for(let i=0; i<5; i++) result += chars.charAt(Math.floor(Math.random() * chars.length));
                 document.getElementById(inputId).value = result;
+            }
+        };
+
+        // --- MENU KEYBOARD NAVIGATION ---
+        const MenuNav = {
+            index: -1,
+            buttons: [],
+            init() {
+                this.buttons = Array.from(document.querySelectorAll('#menu-list button[data-nav="true"]'));
+                this.index = -1;
+                this.updateFocus();
+            },
+            move(dir) {
+                if(this.buttons.length === 0) this.init();
+                this.index += dir;
+                if(this.index < 0) this.index = this.buttons.length - 1;
+                if(this.index >= this.buttons.length) this.index = 0;
+                this.updateFocus();
+            },
+            updateFocus() {
+                this.buttons.forEach((b, i) => {
+                    if(i === this.index) b.classList.add('menu-focus');
+                    else b.classList.remove('menu-focus');
+                });
+            },
+            select() {
+                if(this.index > -1 && this.buttons[this.index]) {
+                    this.buttons[this.index].click();
+                }
             }
         };
 
@@ -433,8 +525,14 @@
                 this.enabled = !this.enabled;
                 const i = document.getElementById('icon-sound');
                 const t = document.getElementById('txt-sound');
-                if(this.enabled) { i.className="ph ph-speaker-high"; t.innerText="Sound On"; }
-                else { i.className="ph ph-speaker-slash"; t.innerText="Sound Off"; }
+                const dict = Lang.data[Lang.current];
+                if(this.enabled) { 
+                    i.className="ph ph-speaker-high"; 
+                    t.innerText=dict.sound_on; 
+                } else { 
+                    i.className="ph ph-speaker-slash"; 
+                    t.innerText=dict.sound_off; 
+                }
                 this.click();
             },
             playTone(freq, type, dur, vol=0.1, slide=0) {
@@ -471,7 +569,6 @@
                 noise.start();
             },
             click() { this.playTone(800, 'triangle', 0.05, 0.05); },
-            bump() { this.playTone(100, 'square', 0.1, 0.1, -50); },
             step() { this.playNoise(0.05, 0.03); },
             win() {
                 if(!this.enabled) return;
@@ -582,10 +679,26 @@
                     if(key==='w'||key==='arrowup') this.keys.w=v; if(key==='s'||key==='arrowdown') this.keys.s=v;
                     if(key==='a'||key==='arrowleft') this.keys.l=v; if(key==='d'||key==='arrowright') this.keys.r=v;
                     
-                    // --- KEYBOARD SHORTCUTS ---
-                    if (v && Game.running) {
-                        if (key === 'm') Game.toggleDimension();
-                        if (key === 'v') Game.toggleCamera();
+                    if (v) {
+                        // Global Esc
+                        if(key === 'escape') {
+                            if(Game.running) Game.quit();
+                            if(!document.getElementById('screen-editor').classList.contains('hidden')) Editor.close();
+                        }
+
+                        // Game Shortcuts
+                        if (Game.running) {
+                            if (key === 'm') Game.toggleDimension();
+                            if (key === 'v') Game.toggleCamera();
+                        }
+
+                        // Menu Navigation (Only if menu is visible)
+                        const menu = document.getElementById('screen-menu');
+                        if (!menu.classList.contains('hidden')) {
+                            if(key === 'arrowup') { MenuNav.move(-1); Sfx.click(); }
+                            if(key === 'arrowdown') { MenuNav.move(1); Sfx.click(); }
+                            if(key === 'enter') { MenuNav.select(); Sfx.click(); }
+                        }
                     }
                 };
                 window.addEventListener('keydown', e=>k(e,true)); window.addEventListener('keyup', e=>k(e,false));
@@ -902,6 +1015,7 @@
 
             init() {
                 Input.init(); GFX.init(); Timer.init(); this.loop();
+                MenuNav.init(); // Init keyboard menu
                 document.querySelectorAll('button').forEach(b => b.addEventListener('click', () => Sfx.click()));
                 document.getElementById('inp-code').addEventListener('keyup', (e)=>{ if(e.key === 'Enter') this.start('code'); });
             },
@@ -921,7 +1035,10 @@
                 } else {
                     Seed.reset();
                     document.getElementById('ui-code-display').classList.add('hidden');
-                    if(mode==='easy'){w=11;h=11;} if(mode==='medium'){w=25;h=25;} if(mode==='hard'){w=51;h=51;}
+                    if(mode==='easy'){w=11;h=11;} 
+                    if(mode==='medium'){w=25;h=25;} 
+                    if(mode==='hard'){w=51;h=51;}
+                    if(mode==='extreme'){w=101;h=101;} // 100x100 (Odd numbers for generator)
                 }
                 if(mode==='custom') { this.map=JSON.parse(JSON.stringify(Editor.grid)); this.w=this.map[0].length; this.h=this.map.length; } 
                 else { this.map = MazeGen.generate(w, h, rng); this.w=w; this.h=h; }
@@ -976,8 +1093,9 @@
                 document.getElementById('c2d').style.display = this.is2D ? 'block' : 'none';
                 document.getElementById('minimap-wrapper').style.display = !this.is2D ? 'block' : 'none';
                 
+                const dict = Lang.data[Lang.current];
                 const dimIcon = this.is2D ? 'ph-cube' : 'ph-map-trifold';
-                const dimText = this.is2D ? '3D View' : '2D Map';
+                const dimText = this.is2D ? dict.view_3d : dict.view_2d;
                 document.getElementById('icon-dim').className = `ph ${dimIcon} text-lg`;
                 document.getElementById('lbl-dim').innerText = dimText;
 
@@ -990,7 +1108,7 @@
                     povBtn.classList.add('active:scale-95');
                 }
                 const povIcon = this.isThirdPerson ? 'ph-eye' : 'ph-person';
-                const povText = this.isThirdPerson ? '1st Person' : '3rd Person';
+                const povText = this.isThirdPerson ? dict.view_1st : dict.view_3rd;
                 document.getElementById('icon-pov').className = `ph ${povIcon} text-lg`;
                 document.getElementById('lbl-pov').innerText = povText;
                 
