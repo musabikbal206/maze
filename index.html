@@ -3,7 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Mazemazing: Timer Edition</title>
+    <title>Mazemazing 3D</title>
+    
+    <!-- PWA Settings -->
+    <meta name="theme-color" content="#020617">
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/svg+xml" href="icon.svg">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Three.js -->
@@ -334,8 +342,17 @@
     </div>
 
     <script>
+        // PWA Registration
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(reg => console.log('SW Registered', reg.scope))
+                    .catch(err => console.log('SW Failed', err));
+            });
+        }
+
         /**
-         * Maze Game with Seeds, Timer, and Random Generation
+         * Maze Game with Seeds, Timer, Random Generation, and Random Start/End
          */
 
         const CONST = {
@@ -388,8 +405,6 @@
                 const totalSecs = Math.floor(ms / 1000);
                 const m = Math.floor(totalSecs / 60).toString().padStart(2, '0');
                 const s = (totalSecs % 60).toString().padStart(2, '0');
-                // Optional: show tenths of seconds
-                // const ds = Math.floor((ms % 1000) / 100);
                 return `${m}:${s}`;
             }
         };
@@ -534,14 +549,24 @@
 
         // --- MAZE ---
         const MazeGen = {
-            // Added rng parameter for Seed support
             generate(w, h, rng = Math.random) {
                 let map = Array(h).fill().map(() => Array(w).fill(CONST.WALL));
+                
                 const stack = [];
-                let startX = 1; let startY = 1;
-                map[startY][startX] = CONST.PATH;
-                stack.push({x: startX, y: startY});
+                // Random odd start point for the generation algorithm
+                const randOdd = (limit) => {
+                    const cols = Math.floor((limit - 1) / 2);
+                    return Math.floor(rng() * cols) * 2 + 1;
+                };
+                let genX = randOdd(w);
+                let genY = randOdd(h);
+
+                map[genY][genX] = CONST.PATH;
+                stack.push({x: genX, y: genY});
+
                 const dirs = [{x:0, y:-2}, {x:0, y:2}, {x:-2, y:0}, {x:2, y:0}];
+                
+                // Generate Maze (DFS)
                 while(stack.length > 0) {
                     const current = stack[stack.length - 1];
                     const neighbors = [];
@@ -553,15 +578,62 @@
                         }
                     }
                     if(neighbors.length > 0) {
-                        // Use the seeded rng() here
                         const next = neighbors[Math.floor(rng() * neighbors.length)];
                         map[next.y][next.x] = CONST.PATH;
                         map[current.y + next.dy][current.x + next.dx] = CONST.PATH;
                         stack.push({x: next.x, y: next.y});
                     } else { stack.pop(); }
                 }
-                map[1][1] = CONST.START;
-                map[h-2][w-2] = CONST.END;
+
+                // --- NEW LOGIC: Identify Dead Ends ---
+                const deadEnds = [];
+                for(let y = 1; y < h - 1; y++) {
+                    for(let x = 1; x < w - 1; x++) {
+                        if(map[y][x] === CONST.PATH) {
+                            let neighbors = 0;
+                            if(map[y-1][x] !== CONST.WALL) neighbors++;
+                            if(map[y+1][x] !== CONST.WALL) neighbors++;
+                            if(map[y][x-1] !== CONST.WALL) neighbors++;
+                            if(map[y][x+1] !== CONST.WALL) neighbors++;
+                            
+                            // If only 1 neighbor (or it's an isolated root), it's a dead end/closed way
+                            if(neighbors === 1) {
+                                deadEnds.push({x, y});
+                            }
+                        }
+                    }
+                }
+
+                // Fallback if maze is weird
+                if(deadEnds.length < 2) {
+                     deadEnds.push({x: genX, y: genY});
+                }
+
+                // 1. Pick Start Point from Random Dead End
+                const startIndex = Math.floor(rng() * deadEnds.length);
+                const startNode = deadEnds[startIndex];
+                map[startNode.y][startNode.x] = CONST.START;
+
+                // 2. Pick End Point from a Distant Dead End
+                // Sort remaining dead ends by distance to startNode
+                const candidates = deadEnds.filter((_, i) => i !== startIndex).map(d => {
+                    return {
+                        node: d,
+                        dist: Math.abs(d.x - startNode.x) + Math.abs(d.y - startNode.y) // Manhattan
+                    };
+                });
+                
+                // Sort descending distance
+                candidates.sort((a, b) => b.dist - a.dist);
+                
+                // Pick randomly from the top 20% furthest candidates to ensure complexity but variety
+                const topCount = Math.max(1, Math.min(5, Math.floor(candidates.length * 0.2)));
+                const chosenCandidate = candidates[Math.floor(rng() * topCount)] || candidates[0];
+                
+                const bestEnd = chosenCandidate ? chosenCandidate.node : deadEnds[(startIndex + 1) % deadEnds.length];
+
+                map[bestEnd.y][bestEnd.x] = CONST.END;
+                
                 return map;
             }
         };
