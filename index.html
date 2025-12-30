@@ -422,9 +422,11 @@
         const CONST = {
             WALL: 1, PATH: 0, START: 2, END: 3,
             CELL_SIZE: 4, 
-            SPEED_3D: 0.05, 
-            SPEED_2D: 0.15,
-            ROT_SPEED: 0.04, 
+            // OLD: SPEED_3D: 0.05, SPEED_2D: 0.15, ROT_SPEED: 0.04
+            // NEW (Per Second):
+            SPEED_3D: 3.5, 
+            SPEED_2D: 10.0,
+            ROT_SPEED: 2.5, 
             COLLISION_RADIUS: 0.2
         };
 
@@ -1073,7 +1075,9 @@
                 GFX.snapCamera = true;
                 
                 this.running=true;
-                Timer.start(); this.updateUI();
+                Timer.start(); 
+                this.lastTime = Date.now();
+                this.updateUI();
             },
             toggleDimension() { 
                 this.is2D = !this.is2D;
@@ -1118,31 +1122,45 @@
                 requestAnimationFrame(()=>this.loop());
                 if(!this.running) return;
                 
+                // --- DELTA TIME CALCULATION ---
+                const now = Date.now();
+                // Calculate time in seconds (max 0.1s to prevent huge jumps if lag occurs)
+                const dt = Math.min((now - this.lastTime) / 1000, 0.1); 
+                this.lastTime = now;
+                // -----------------------------
+
                 const input = Input.get(!this.is2D);
                 
                 if(!this.is2D) {
-                    this.player.dir += input.rot * CONST.ROT_SPEED;
+                    // Multiply rotation by dt
+                    this.player.dir += input.rot * CONST.ROT_SPEED * dt;
+                    
                     if(Math.abs(input.dz) > 0.05) {
-                        const speed = input.dz * CONST.SPEED_3D;
+                        // Multiply speed by dt
+                        const speed = input.dz * CONST.SPEED_3D * dt;
                         const dx = -Math.sin(this.player.dir) * speed;
                         const dz = -Math.cos(this.player.dir) * speed;
                         this.move(dx, dz);
                         
-                        if(Date.now() - this.stepTimer > 400) {
+                        if(now - this.stepTimer > 400) {
                             Sfx.step();
-                            this.stepTimer = Date.now();
+                            this.stepTimer = now;
                         }
                     }
                 } else {
                     if(Math.abs(input.dx)>0.05 || Math.abs(input.dz)>0.05) {
-                        const dx = input.dx * CONST.SPEED_2D;
-                        const dz = input.dz * CONST.SPEED_2D;
+                        // Multiply speed by dt
+                        const dx = input.dx * CONST.SPEED_2D * dt;
+                        const dz = input.dz * CONST.SPEED_2D * dt;
                         this.move(dx, dz);
                         if(dx!==0 || dz!==0) this.player.dir = Math.atan2(dx, -dz);
                     }
                 }
+                
+                // ... rest of the function remains the same ...
                 const gx=Math.floor(this.player.x), gz=Math.floor(this.player.z);
                 if(this.map[gz][gx]===CONST.END) {
+                    // ... win condition code ...
                     this.running=false;
                     const finalTime = Timer.stop();
                     document.getElementById('victory-time').innerText = finalTime;
