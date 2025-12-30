@@ -1267,6 +1267,7 @@
                 document.getElementById('screen-menu').classList.add('hidden');
                 document.getElementById('screen-editor').classList.remove('hidden');
                 document.getElementById('screen-editor').classList.add('flex');
+                this.updateUI();
                 setTimeout(()=>this.render(), 10);
                 const vp = document.getElementById('editor-grid');
                 const handleStart = (e) => {
