@@ -2,12 +2,9 @@ const CACHE_NAME = 'maze-master-v1';
 const ASSETS = [
   './',
   './index.html',
-  './icon.svg',
-  './manifest.json',
-  // External libraries (Caching these makes it work offline after first load)
-  'https://cdn.tailwindcss.com',
-  'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js',
-  'https://unpkg.com/@phosphor-icons/web'
+  './icon.png',       // Make sure you have this file!
+  './manifest.json'
+  // I REMOVED the external links (Tailwind, Three.js) to fix the crash.
 ];
 
 // Install Event: Cache files
