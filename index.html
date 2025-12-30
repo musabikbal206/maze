@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Mazemazing 3D Pro</title>
-    
+    <title>Mazemazing</title>
+    <link rel="manifest" href="./manifest.json">   
     <!-- PWA Settings -->
     <meta name="theme-color" content="#020617">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -19,7 +19,7 @@
 
     <style>
         /* Core Reset */
-        body, html { margin: 0; padding: 0; overflow: hidden; background-color: #020617; touch-action: none; font-family: 'Segoe UI', system-ui, sans-serif; height: 100%; width: 100%; user-select: none; -webkit-user-select: none; }
+        body, html { margin: 0; padding: 0; overflow: hidden; background-color: #020617; touch-action: none; font-family: 'Segoe UI', system-ui, sans-serif; height: 100%; width: 100%; user-select: none; -webkit-user-select: none; transition: background-color 0.5s; }
         
         /* Game Layer */
         #game-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
@@ -58,6 +58,10 @@
             display: none;
             box-shadow: 0 4px 12px rgba(0,0,0,0.3);
         }
+        #game-timer.danger { color: #ef4444; animation: pulse-red 1s infinite; }
+        #game-timer.turbo { color: #f59e0b; border-color: #f59e0b; }
+
+        @keyframes pulse-red { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
 
         /* Controls */
         #controls-ui { display: none; width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 50; pointer-events: none; }
@@ -91,12 +95,21 @@
             transition: transform 0.05s linear;
         }
 
-        /* Editor */
+        /* Editor Default (Night Mode) */
         .grid-cell { box-sizing: border-box; border: 1px solid rgba(255,255,255,0.05); cursor: pointer; }
         .c-wall { background: #475569; }
         .c-path { background: #0f172a; }
         .c-start { background: #10b981; }
         .c-end { background: #ef4444; }
+
+        /* Editor Day Mode Overrides */
+        .theme-day .c-wall { background: #15803d; border-color: #166534; } /* Green Hedge */
+        .theme-day .c-path { background: #86efac; border-color: #4ade80; } /* Light Grass */
+        .theme-day .grid-cell { border: 1px solid rgba(0,0,0,0.05); }
+
+        /* Editor Tool Icons in Day Mode */
+        .theme-day .icon-wall-preview { background-color: #15803d !important; border-color: #166534 !important; }
+        .theme-day .icon-path-preview { background-color: #86efac !important; border-color: #4ade80 !important; }
 
         #editor-viewport { overflow: auto; touch-action: pan-x pan-y; cursor: grab; }
         #editor-viewport.mode-draw { touch-action: none; cursor: crosshair; }
@@ -107,6 +120,12 @@
             background-color: #020617;
             background-image: radial-gradient(rgba(51, 65, 85, 0.4) 1px, transparent 1px);
             background-size: 24px 24px;
+        }
+        
+        /* Day Mode Grid Pattern */
+        .theme-day .bg-grid-pattern {
+            background-color: #f0f9ff; /* Sky 50 */
+            background-image: radial-gradient(rgba(14, 165, 233, 0.2) 1px, transparent 1px);
         }
 
         @keyframes glow {
@@ -148,6 +167,16 @@
         .custom-scroll::-webkit-scrollbar-track { background: #0f172a; }
         .custom-scroll::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
         .custom-scroll::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+        /* Mode Selectors */
+        .mode-btn.active { background-color: #0891b2; color: white; border-color: #22d3ee; }
+        .mode-btn { background-color: #1e293b; color: #94a3b8; border: 1px solid #334155; }
+        
+        /* Day Mode Button Overrides */
+        .theme-day .mode-btn { background-color: #e0f2fe; color: #0369a1; border-color: #bae6fd; }
+        .theme-day .mode-btn.active { background-color: #0284c7; color: white; border-color: #0ea5e9; }
+        .theme-day .menu-focus { background-color: #f0f9ff !important; outline-color: #0ea5e9; }
+        
     </style>
 </head>
 <body>
@@ -184,57 +213,79 @@
     </div>
 
     <!-- Main Menu -->
-    <div id="screen-menu" class="ui-screen interactive bg-slate-950/95 flex items-center justify-center overflow-y-auto">
-        <!-- Language Toggle -->
-        <button onclick="Lang.toggle()" class="absolute top-6 right-6 bg-slate-800 text-slate-400 hover:text-white px-3 py-1 rounded-lg font-bold text-xs border border-slate-700 flex items-center gap-2">
-            <i class="ph ph-globe"></i> <span id="lbl-lang">EN</span>
-        </button>
+    <div id="screen-menu" class="ui-screen interactive bg-slate-950/95 flex items-center justify-center overflow-y-auto transition-colors duration-500">
+        <!-- Top Right Controls -->
+        <div class="absolute top-6 right-6 flex gap-2 z-50">
+            <!-- Theme Toggle -->
+            <button onclick="Game.toggleTheme()" class="bg-slate-800 text-yellow-400 hover:text-white px-3 py-1 rounded-lg font-bold text-lg border border-slate-700 flex items-center justify-center transition hover:bg-slate-700 shadow-lg" title="Toggle Theme">
+                <i id="icon-theme" class="ph ph-moon"></i>
+            </button>
+            <!-- Language Toggle -->
+            <button onclick="Lang.toggle()" class="bg-slate-800 text-slate-400 hover:text-white px-3 py-1 rounded-lg font-bold text-xs border border-slate-700 flex items-center gap-2 transition hover:bg-slate-700 shadow-lg">
+                <i class="ph ph-globe"></i> <span id="lbl-lang">EN</span>
+            </button>
+        </div>
 
-        <div class="text-center max-w-md w-full p-6 my-auto">
-            <h1 class="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-600 mb-2">MAZEMAZING</h1>
-            <p class="text-slate-500 mb-8 font-mono text-sm" data-i18n="subtitle">3D / 2D Engine • Pro</p>
+        <div class="text-center max-w-md w-full p-6 my-auto relative flex flex-col items-center">
+            <!-- Title Section - Adjusted for visibility -->
+            <div class="mb-12 mt-8 md:mt-0 relative z-10">
+                <h1 class="text-6xl md:text-7xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-600 mb-2 py-4 filter drop-shadow-lg tracking-tight leading-tight">MAZEMAZING</h1>
+                <!-- Subtitle Removed per request -->
+            </div>
 
-            <div class="space-y-3" id="menu-list">
+            <!-- Mode Selection -->
+            <div class="flex gap-2 mb-8 justify-center w-full">
+                <button onclick="Game.setMode('standard')" id="mode-standard" class="mode-btn active px-4 py-3 rounded-xl font-bold text-xs transition flex flex-col items-center gap-1 w-24 shadow-md">
+                    <i class="ph ph-person-simple-walk text-xl"></i> STANDARD
+                </button>
+                <button onclick="Game.setMode('ghost')" id="mode-ghost" class="mode-btn px-4 py-3 rounded-xl font-bold text-xs transition flex flex-col items-center gap-1 w-24 shadow-md">
+                    <i class="ph ph-ghost text-xl"></i> GHOST
+                </button>
+                <button onclick="Game.setMode('time')" id="mode-time" class="mode-btn px-4 py-3 rounded-xl font-bold text-xs transition flex flex-col items-center gap-1 w-24 shadow-md">
+                    <i class="ph ph-timer text-xl"></i> TIMED
+                </button>
+            </div>
+
+            <div class="space-y-3 w-full" id="menu-list">
                 <button data-nav="true" onclick="Game.start('easy')" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-4 rounded-xl font-bold shadow-lg transition transform active:scale-95 border-2 border-transparent" data-i18n="easy">Easy (10x10)</button>
                 <button data-nav="true" onclick="Game.start('medium')" class="w-full bg-amber-600 hover:bg-amber-500 text-white py-4 rounded-xl font-bold shadow-lg transition transform active:scale-95 border-2 border-transparent" data-i18n="medium">Medium (25x25)</button>
                 <button data-nav="true" onclick="Game.start('hard')" class="w-full bg-rose-600 hover:bg-rose-500 text-white py-4 rounded-xl font-bold shadow-lg transition transform active:scale-95 border-2 border-transparent" data-i18n="hard">Hard (50x50)</button>
-                <!-- EXTREME MODE BUTTON -->
                 <button data-nav="true" onclick="Game.start('extreme')" class="w-full bg-purple-700 hover:bg-purple-600 text-white py-4 rounded-xl font-bold shadow-lg transition transform active:scale-95 border-2 border-transparent ring-1 ring-purple-400/50" data-i18n="extreme">Extreme (100x100)</button>
                 
-                <div class="relative py-4 flex items-center">
-                    <div class="flex-grow border-t border-slate-800"></div>
-                    <span class="flex-shrink-0 mx-4 text-slate-600 text-xs font-bold" data-i18n="code_label">OR USE A CODE</span>
-                    <div class="flex-grow border-t border-slate-800"></div>
+                <div class="relative py-6 flex items-center">
+                    <div class="flex-grow border-t border-slate-700"></div>
+                    <span class="flex-shrink-0 mx-4 text-slate-500 text-xs font-bold" data-i18n="code_label">OR USE A CODE</span>
+                    <div class="flex-grow border-t border-slate-700"></div>
                 </div>
 
-                <div class="bg-slate-900/50 p-3 rounded-xl border border-slate-800 space-y-2">
+                <div class="bg-slate-900/50 p-3 rounded-xl border border-slate-800 space-y-2 menu-input-group transition-colors">
                     <div class="flex gap-2">
                         <input id="inp-code" type="text" placeholder="CODE" class="input-glow flex-1 bg-slate-950 border border-slate-700 text-cyan-400 font-mono font-bold text-center rounded-lg px-2 h-10 focus:outline-none focus:border-cyan-500 transition placeholder-slate-600 uppercase">
-                        <button onclick="Utils.randomCode('inp-code')" class="w-10 h-10 bg-slate-800 text-slate-300 hover:text-white rounded-lg flex items-center justify-center transition" title="Random Code">
+                        <button onclick="Utils.randomCode('inp-code')" class="w-10 h-10 bg-slate-800 text-slate-300 hover:text-white rounded-lg flex items-center justify-center transition shadow-sm border border-transparent" title="Random Code">
                             <i class="ph ph-dice-five text-xl"></i>
                         </button>
                     </div>
                     
                     <div class="flex gap-2">
-                         <select id="inp-size" class="h-10 bg-slate-950 text-slate-300 border border-slate-700 rounded-lg px-2 text-xs font-bold outline-none focus:border-cyan-500">
+                         <select id="inp-size" class="h-10 bg-slate-950 text-slate-300 border border-slate-700 rounded-lg px-2 text-xs font-bold outline-none focus:border-cyan-500 flex-1">
                              <option value="11">SMALL (10x10)</option>
                              <option value="25" selected>MEDIUM (25x25)</option>
                              <option value="51">LARGE (50x50)</option>
                              <option value="101">EXTREME (100x100)</option>
                          </select>
-                         <button onclick="Game.start('code')" class="flex-1 h-10 bg-cyan-700 hover:bg-cyan-600 text-white rounded-lg font-bold shadow-lg transition transform active:scale-95 text-sm" data-i18n="load_map">
-                             LOAD MAP
+                         <button onclick="Game.start('code')" class="h-10 px-4 bg-cyan-700 hover:bg-cyan-600 text-white rounded-lg font-bold shadow-lg transition transform active:scale-95 text-sm border-transparent" data-i18n="load_map">
+                             LOAD
                          </button>
                     </div>
                 </div>
 
                 <div class="h-4"></div>
-                <button data-nav="true" onclick="Editor.open()" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 py-3 rounded-xl font-bold shadow-lg flex items-center justify-center gap-2 border-2 border-transparent transition">
+                <button data-nav="true" onclick="Editor.open()" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 py-3 rounded-xl font-bold shadow-lg flex items-center justify-center gap-2 border-2 border-transparent transition menu-editor-btn">
                     <i class="ph ph-pencil-simple"></i> <span data-i18n="map_editor">Map Editor</span>
                 </button>
                 
                 <div class="flex justify-center mt-4">
-                    <button onclick="Sfx.toggle()" class="text-slate-500 hover:text-white transition flex items-center gap-2 text-sm font-bold">
+                    <button onclick="Sfx.toggle()" class="text-slate-500 hover:text-slate-300 transition flex items-center gap-2 text-sm font-bold">
                         <i id="icon-sound" class="ph ph-speaker-high text-lg"></i> <span id="txt-sound" data-i18n="sound_on">Sound On</span>
                     </button>
                 </div>
@@ -276,10 +327,10 @@
         </div>
     </div>
 
-    <!-- Editor UI - DESKTOP REDESIGN -->
-    <div id="screen-editor" class="ui-screen hidden bg-slate-950 z-50 flex-col interactive font-sans">
+    <!-- Editor UI -->
+    <div id="screen-editor" class="ui-screen hidden bg-slate-950 z-50 flex-col interactive font-sans transition-colors duration-300">
         <!-- Header -->
-        <div class="h-16 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-4 md:px-6 shrink-0 shadow-lg z-20">
+        <div class="h-16 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-4 md:px-6 shrink-0 shadow-lg z-20 transition-colors duration-300" id="editor-header">
             <div class="flex items-center gap-3">
                 <div class="w-8 h-8 bg-cyan-600 rounded-lg flex items-center justify-center text-white shadow-cyan-500/20 shadow-lg hidden md:flex">
                     <i class="ph ph-pencil-simple-line text-xl"></i>
@@ -290,7 +341,7 @@
                 </div>
             </div>
             <div class="flex gap-3">
-                <button onclick="Editor.close()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white px-4 py-2 rounded-lg font-bold text-sm transition border border-slate-700">
+                <button onclick="Editor.close()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white px-4 py-2 rounded-lg font-bold text-sm transition border border-slate-700" id="btn-editor-back">
                     <span data-i18n="back">Back</span>
                 </button>
                 <button onclick="Game.start('custom')" class="bg-green-600 hover:bg-green-500 text-white px-5 py-2 rounded-lg font-bold shadow-lg flex items-center gap-2 text-sm transition transform active:scale-95">
@@ -301,16 +352,15 @@
 
         <div class="flex flex-1 overflow-hidden flex-col-reverse md:flex-row relative">
             
-            <!-- Sidebar (Desktop: Left, Mobile: Bottom - Responsive Grid) -->
-            <div class="w-full md:w-72 bg-slate-900 border-t md:border-t-0 md:border-r border-slate-800 flex flex-col z-10 shadow-xl overflow-y-auto custom-scroll shrink-0 max-h-[40vh] md:max-h-full">
+            <!-- Sidebar -->
+            <div class="w-full md:w-72 bg-slate-900 border-t md:border-t-0 md:border-r border-slate-800 flex flex-col z-10 shadow-xl overflow-y-auto custom-scroll shrink-0 max-h-[40vh] md:max-h-full transition-colors duration-300" id="editor-sidebar">
                 <div class="p-2 md:p-4 grid grid-cols-2 md:flex md:flex-col gap-2 md:space-y-6">
                     
-                    <!-- Group 1: Tools & Brushes (Left Column on Mobile) -->
                     <div class="space-y-2 md:space-y-6 flex flex-col">
                         <!-- Tools Section -->
                         <div class="space-y-1 md:space-y-2">
                             <h3 class="text-[10px] md:text-xs font-bold text-slate-500 uppercase tracking-wider hidden md:block">Mode</h3>
-                            <div class="flex bg-slate-950 p-1 rounded-lg border border-slate-800">
+                            <div class="flex bg-slate-950 p-1 rounded-lg border border-slate-800 transition-colors" id="editor-tools-bg">
                                 <button onclick="Editor.setMode('draw')" id="btn-mode-draw" class="flex-1 py-1 md:py-2 rounded-md transition flex justify-center items-center text-[10px] md:text-xs font-bold gap-2">
                                     <i class="ph ph-pencil-simple text-sm md:text-lg"></i> <span class="hidden sm:inline" data-i18n="draw">DRAW</span>
                                 </button>
@@ -325,11 +375,11 @@
                              <h3 class="text-[10px] md:text-xs font-bold text-slate-500 uppercase tracking-wider hidden md:block">Brushes</h3>
                              <div class="grid grid-cols-4 md:grid-cols-2 gap-1 md:gap-2 h-full">
                                  <button onclick="Editor.setTool(1)" id="t-1" class="tool-btn h-12 md:h-20 bg-slate-800 hover:bg-slate-700 rounded-lg border-2 border-transparent transition flex flex-col items-center justify-center gap-1 md:gap-2 group">
-                                    <div class="w-4 h-4 md:w-8 md:h-8 bg-slate-500 border border-slate-400 rounded group-hover:scale-110 transition"></div>
+                                    <div class="icon-wall-preview w-4 h-4 md:w-8 md:h-8 bg-slate-500 border border-slate-400 rounded group-hover:scale-110 transition"></div>
                                     <span class="text-[9px] md:text-xs font-bold text-slate-400 group-hover:text-white hidden md:block" data-i18n="wall">Wall</span>
                                  </button>
                                  <button onclick="Editor.setTool(0)" id="t-0" class="tool-btn h-12 md:h-20 bg-slate-800 hover:bg-slate-700 rounded-lg border-2 border-transparent transition flex flex-col items-center justify-center gap-1 md:gap-2 group">
-                                    <div class="w-4 h-4 md:w-8 md:h-8 bg-slate-950 border border-slate-600 rounded group-hover:scale-110 transition"></div>
+                                    <div class="icon-path-preview w-4 h-4 md:w-8 md:h-8 bg-slate-950 border border-slate-600 rounded group-hover:scale-110 transition"></div>
                                     <span class="text-[9px] md:text-xs font-bold text-slate-400 group-hover:text-white hidden md:block" data-i18n="path">Path</span>
                                  </button>
                                  <button onclick="Editor.setTool(2)" id="t-2" class="tool-btn h-12 md:h-20 bg-slate-800 hover:bg-slate-700 rounded-lg border-2 border-transparent transition flex flex-col items-center justify-center gap-1 md:gap-2 group">
@@ -344,22 +394,20 @@
                         </div>
                     </div>
 
-                    <!-- Divider (Hidden on Mobile) -->
-                    <div class="h-px bg-slate-800 hidden md:block"></div>
+                    <!-- Divider -->
+                    <div class="h-px bg-slate-800 hidden md:block" id="editor-divider"></div>
 
-                    <!-- Group 2: Settings & Gen (Right Column on Mobile) -->
+                    <!-- Group 2: Settings & Gen -->
                     <div class="space-y-2 md:space-y-6 flex flex-col justify-between">
                         <!-- Settings Section -->
                         <div class="space-y-2 md:space-y-4">
                             <h3 class="text-[10px] md:text-xs font-bold text-slate-500 uppercase tracking-wider hidden md:block">Properties</h3>
-                            
                             <div class="space-y-1">
                                 <div class="flex justify-between text-[10px] md:text-xs text-slate-400">
                                     <span data-i18n="prop_grid">Grid Size</span> <span id="lbl-size" class="font-mono text-cyan-400">10x</span>
                                 </div>
                                 <input type="range" min="10" max="100" step="5" value="10" onchange="Editor.resize(this.value)" class="w-full accent-cyan-500 h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer">
                             </div>
-
                             <div class="space-y-1">
                                 <div class="flex justify-between text-[10px] md:text-xs text-slate-400">
                                     <span data-i18n="prop_zoom">Zoom Level</span>
@@ -369,15 +417,14 @@
                         </div>
 
                         <!-- Generator Section -->
-                        <div class="bg-slate-950 p-2 md:p-3 rounded-xl border border-slate-800 space-y-2 md:space-y-3">
+                        <div class="bg-slate-950 p-2 md:p-3 rounded-xl border border-slate-800 space-y-2 md:space-y-3 transition-colors" id="editor-gen-box">
                             <h3 class="text-[10px] md:text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2"><i class="ph ph-magic-wand"></i> <span class="hidden sm:inline" data-i18n="gen_title">Generator</span></h3>
-                            
                             <div class="flex gap-2">
                                 <div class="relative flex-1">
-                                    <input id="ed-code" type="text" placeholder="SEED" class="w-full bg-slate-900 border border-slate-700 text-white text-[10px] md:text-xs px-2 h-6 md:h-8 rounded uppercase font-mono focus:border-cyan-500 outline-none">
+                                    <input id="ed-code" type="text" placeholder="SEED" class="w-full bg-slate-900 border border-slate-700 text-white text-[10px] md:text-xs px-2 h-6 md:h-8 rounded uppercase font-mono focus:border-cyan-500 outline-none transition-colors">
                                     <button onclick="Utils.randomCode('ed-code')" class="absolute right-1 top-0.5 text-slate-500 hover:text-white p-1"><i class="ph ph-dice-five"></i></button>
                                 </div>
-                                <select id="ed-size" class="bg-slate-900 text-slate-300 border border-slate-700 rounded text-[10px] md:text-xs h-6 md:h-8 px-1 w-12 md:w-14">
+                                <select id="ed-size" class="bg-slate-900 text-slate-300 border border-slate-700 rounded text-[10px] md:text-xs h-6 md:h-8 px-1 w-12 md:w-14 transition-colors">
                                     <option value="11">10x</option>
                                     <option value="25" selected>25x</option>
                                     <option value="51">50x</option>
@@ -386,7 +433,6 @@
                             </div>
                             <button onclick="Editor.generateFromCode()" class="w-full bg-cyan-700 hover:bg-cyan-600 text-white text-[10px] md:text-xs h-6 md:h-8 rounded font-bold transition" data-i18n="gen">GEN</button>
                         </div>
-
                         <button onclick="Editor.clear()" class="w-full border border-red-900/50 text-red-400 hover:bg-red-900/20 py-2 md:py-3 rounded-lg text-[10px] md:text-xs font-bold flex items-center justify-center gap-2 transition">
                             <i class="ph ph-trash text-sm md:text-lg"></i> <span class="hidden sm:inline" data-i18n="clear">CLEAR MAP</span>
                         </button>
@@ -395,19 +441,29 @@
             </div>
 
             <!-- Viewport -->
-            <div id="editor-viewport" class="flex-1 bg-grid-pattern relative p-4 md:p-8 mode-draw overflow-hidden flex items-center justify-center">
+            <div id="editor-viewport" class="flex-1 bg-grid-pattern relative p-4 md:p-8 mode-draw overflow-hidden flex items-center justify-center transition-colors duration-300">
                 <div id="editor-grid"></div>
             </div>
         </div>
     </div>
 
-    <!-- Victory -->
+    <!-- Victory Screen -->
     <div id="screen-victory" class="ui-screen hidden bg-black/95 interactive items-center justify-center z-[100] text-center p-6">
-        <div class="max-w-sm w-full bg-slate-900 p-8 rounded-3xl border border-yellow-500/20 shadow-2xl">
+        <div class="max-w-sm w-full bg-slate-900 p-8 rounded-3xl border border-yellow-500/20 shadow-2xl transition-colors" id="box-victory">
             <i class="ph ph-crown text-6xl text-yellow-400 mb-4 inline-block animate-bounce"></i>
-            <h2 class="text-4xl font-black text-white mb-2" data-i18n="complete">COMPLETE!</h2>
-            <div class="text-2xl font-mono text-cyan-400 font-bold mb-6 bg-slate-950 p-2 rounded-lg border border-slate-800" id="victory-time">00:00</div>
+            <h2 class="text-4xl font-black text-white mb-2" data-i18n="complete" id="victory-title">COMPLETE!</h2>
+            <div class="text-2xl font-mono text-cyan-400 font-bold mb-6 bg-slate-950 p-2 rounded-lg border border-slate-800 transition-colors" id="victory-time">00:00</div>
             <button onclick="Game.quit()" class="w-full bg-cyan-600 hover:bg-cyan-500 text-white py-4 rounded-xl font-bold shadow-lg transition" data-i18n="main_menu">Main Menu</button>
+        </div>
+    </div>
+
+    <!-- Game Over Screen -->
+    <div id="screen-gameover" class="ui-screen hidden bg-red-950/90 interactive items-center justify-center z-[100] text-center p-6">
+        <div class="max-w-sm w-full bg-slate-900 p-8 rounded-3xl border border-red-500/50 shadow-2xl transition-colors" id="box-gameover">
+            <i class="ph ph-skull text-6xl text-red-500 mb-4 inline-block animate-pulse"></i>
+            <h2 class="text-4xl font-black text-white mb-2" id="gameover-title">GAME OVER</h2>
+            <p class="text-slate-400 mb-6" id="fail-reason">The ghost caught you!</p>
+            <button onclick="Game.quit()" class="w-full bg-slate-700 hover:bg-slate-600 text-white py-4 rounded-xl font-bold shadow-lg transition" data-i18n="main_menu">Main Menu</button>
         </div>
     </div>
 
@@ -422,12 +478,25 @@
         const CONST = {
             WALL: 1, PATH: 0, START: 2, END: 3,
             CELL_SIZE: 4, 
-            // OLD: SPEED_3D: 0.05, SPEED_2D: 0.15, ROT_SPEED: 0.04
-            // NEW (Per Second):
             SPEED_3D: 3.5, 
             SPEED_2D: 10.0,
             ROT_SPEED: 2.5, 
-            COLLISION_RADIUS: 0.2
+            COLLISION_RADIUS: 0.2,
+            GHOST_SPEED: 1.8,
+            TIME_PENALTY_2D: 3.0 // Time passes 3x faster in 2D
+        };
+
+        const Theme = {
+            current: 'night',
+            data: {
+                night: { bg: 0x020617, fog: 0x020617, ambient: 0.4, cssBg: '#020617' },
+                day: { bg: 0x87CEEB, fog: 0x87CEEB, ambient: 0.8, cssBg: '#f0f9ff' }
+            },
+            toggle() {
+                this.current = this.current === 'night' ? 'day' : 'night';
+                return this.current;
+            },
+            get() { return this.data[this.current]; }
         };
 
         // --- LANGUAGE SYSTEM (EN/TR) ---
@@ -468,7 +537,6 @@
                     const key = el.getAttribute('data-i18n');
                     if(dict[key]) el.innerText = dict[key];
                 });
-                // Update sound text manually if needed
                 const sfxText = Sfx.enabled ? dict.sound_on : dict.sound_off;
                 document.getElementById('txt-sound').innerText = sfxText;
             },
@@ -484,7 +552,6 @@
             }
         };
 
-        // --- MENU KEYBOARD NAVIGATION ---
         const MenuNav = {
             index: -1,
             buttons: [],
@@ -513,7 +580,6 @@
             }
         };
 
-        // --- PROCEDURAL SOUND SYSTEM ---
         const Sfx = {
             ctx: null, enabled: true,
             init() {
@@ -577,52 +643,150 @@
                 [0, 150, 300, 450].forEach((d, i) => {
                     setTimeout(() => this.playTone(440 + (i*110), 'triangle', 0.3, 0.1), d);
                 });
+            },
+            loss() {
+                if(!this.enabled) return;
+                [0, 200, 400].forEach((d, i) => {
+                    setTimeout(() => this.playTone(150 - (i*30), 'sawtooth', 0.4, 0.2), d);
+                });
             }
         };
 
-        // --- PROCEDURAL TEXTURES ---
         const TexGen = {
-            createWall() {
+            createTechWall() {
                 const s = 512;
                 const c = document.createElement('canvas'); c.width=s; c.height=s;
                 const ctx = c.getContext('2d');
                 ctx.fillStyle = '#1e293b'; ctx.fillRect(0,0,s,s);
+                for(let i=0; i<4000; i++) {
+                    ctx.fillStyle = Math.random()>0.5 ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.2)';
+                    ctx.fillRect(Math.random()*s, Math.random()*s, 2, 2);
+                }
                 ctx.fillStyle = '#334155'; const padding = 20; ctx.fillRect(padding, padding, s-padding*2, s-padding*2);
-                ctx.fillStyle = '#64748b'; const r = 4; const locs = [40, s-40];
-                locs.forEach(x => locs.forEach(y => { ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill(); }));
-                ctx.strokeStyle = '#0ea5e9'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(40, s/2); ctx.lineTo(s-40, s/2); ctx.stroke();
-                const tex = new THREE.CanvasTexture(c); tex.magFilter = THREE.NearestFilter; return tex;
+                ctx.fillStyle = '#475569'; 
+                const r = 5; const locs = [40, s-40];
+                locs.forEach(x => locs.forEach(y => { 
+                    ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill(); 
+                    ctx.fillStyle='rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.arc(x+2,y+2,r,0,Math.PI*2); ctx.fill(); ctx.fillStyle='#475569';
+                }));
+                ctx.strokeStyle = '#0ea5e9'; ctx.lineWidth = 3; 
+                ctx.beginPath(); ctx.moveTo(40, s/2); ctx.lineTo(s-40, s/2); ctx.stroke();
+                ctx.shadowBlur=10; ctx.shadowColor='#0ea5e9'; ctx.stroke(); ctx.shadowBlur=0;
+                return new THREE.CanvasTexture(c);
             },
-            createFloor() {
+            createTechFloor() {
                 const s = 512;
                 const c = document.createElement('canvas'); c.width=s; c.height=s;
                 const ctx = c.getContext('2d');
-                ctx.fillStyle = '#020617'; ctx.fillRect(0,0,s,s);
-                ctx.strokeStyle = 'rgba(34, 211, 238, 0.2)'; ctx.lineWidth = 4;
+                ctx.fillStyle = '#0f172a'; ctx.fillRect(0,0,s,s);
+                ctx.strokeStyle = 'rgba(34, 211, 238, 0.15)'; ctx.lineWidth = 4;
                 ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(s,0); ctx.lineTo(s,s); ctx.stroke();
+                for(let i=0; i<2000; i++) {
+                     ctx.fillStyle = 'rgba(255,255,255,0.02)';
+                     ctx.fillRect(Math.random()*s, Math.random()*s, 2, 2);
+                }
+                const tex = new THREE.CanvasTexture(c); tex.wrapS = THREE.RepeatWrapping; tex.wrapT = THREE.RepeatWrapping; return tex;
+            },
+            createHedgeWall() {
+                const s = 512;
+                const c = document.createElement('canvas'); c.width=s; c.height=s;
+                const ctx = c.getContext('2d');
+                ctx.fillStyle = '#064e3b'; // Base dark green
+                ctx.fillRect(0,0,s,s);
+                // Leaves
+                for(let i=0; i<15000; i++) {
+                    const val = Math.floor(Math.random() * 80);
+                    ctx.fillStyle = `rgb(${20+val}, ${80+val}, ${20+val})`; 
+                    const lx = Math.random() * s;
+                    const ly = Math.random() * s;
+                    const ls = Math.random() * 10 + 4;
+                    ctx.beginPath(); ctx.arc(lx, ly, ls, 0, Math.PI*2); ctx.fill();
+                }
+                // Shadow Vignette
+                const grad = ctx.createRadialGradient(s/2, s/2, s/3, s/2, s/2, s/1.5);
+                grad.addColorStop(0, 'rgba(0,0,0,0)');
+                grad.addColorStop(1, 'rgba(0,0,0,0.5)');
+                ctx.fillStyle = grad;
+                ctx.fillRect(0,0,s,s);
+                return new THREE.CanvasTexture(c);
+            },
+            createGrassFloor() {
+                const s = 512;
+                const c = document.createElement('canvas'); c.width=s; c.height=s;
+                const ctx = c.getContext('2d');
+                ctx.fillStyle = '#14532d'; // Dirtier green
+                ctx.fillRect(0,0,s,s);
+                // Grass blades
+                for(let i=0; i<10000; i++) {
+                     ctx.fillStyle = Math.random()>0.5 ? '#166534' : '#15803d';
+                     ctx.fillRect(Math.random()*s, Math.random()*s, 3, 3);
+                }
+                // Dirt patches
+                for(let i=0; i<50; i++) {
+                    ctx.fillStyle = 'rgba(60, 40, 10, 0.2)';
+                    const lx = Math.random() * s;
+                    const ly = Math.random() * s;
+                    const r = Math.random() * 50;
+                    ctx.beginPath(); ctx.arc(lx, ly, r, 0, Math.PI*2); ctx.fill();
+                }
                 const tex = new THREE.CanvasTexture(c); tex.wrapS = THREE.RepeatWrapping; tex.wrapT = THREE.RepeatWrapping; return tex;
             }
         };
 
         const Timer = {
-            el: null, elapsed: 0, lastTick: 0, interval: null, running: false,
+            el: null, elapsed: 0, timeLeft: 0, lastTick: 0, interval: null, running: false, mode: 'normal',
             init() { this.el = document.getElementById('game-timer'); },
-            start() {
-                this.running = true; this.elapsed = 0; this.lastTick = Date.now();
-                this.el.style.display = 'block'; this.update();
+            start(mode, limitSeconds) {
+                this.running = true; this.mode = mode;
+                this.lastTick = Date.now();
+                this.el.style.display = 'block';
+                this.el.classList.remove('danger', 'turbo');
+                
+                if (mode === 'time') {
+                    this.timeLeft = limitSeconds * 1000;
+                    this.elapsed = 0;
+                    this.el.innerText = this.format(this.timeLeft);
+                } else {
+                    this.elapsed = 0;
+                    this.el.innerText = '00:00';
+                }
+                this.update();
                 this.interval = setInterval(() => this.update(), 100);
             },
             stop() { this.running = false; clearInterval(this.interval); return this.format(this.elapsed); },
-            reset() { this.running = false; clearInterval(this.interval); this.elapsed = 0; this.el.style.display = 'none'; this.el.innerText = '00:00'; },
+            reset() { this.running = false; clearInterval(this.interval); this.elapsed = 0; this.el.style.display = 'none'; },
             update() {
                 if(!this.running) return;
-                const now = Date.now(); const delta = now - this.lastTick; this.lastTick = now;
-                const multiplier = (!Game.is2D) ? 1 : (CONST.SPEED_2D / CONST.SPEED_3D);
-                this.elapsed += delta * multiplier;
-                this.el.innerText = this.format(this.elapsed);
+                const now = Date.now(); 
+                let delta = now - this.lastTick; 
+                this.lastTick = now;
+                
+                if (this.mode === 'time') {
+                    // --- TIME SPEED MULTIPLIER FOR 2D ---
+                    if (Game.is2D) {
+                        delta *= CONST.TIME_PENALTY_2D;
+                        this.el.classList.add('turbo');
+                    } else {
+                        this.el.classList.remove('turbo');
+                    }
+                    // ------------------------------------
+
+                    this.timeLeft -= delta;
+                    if (this.timeLeft <= 0) {
+                        this.timeLeft = 0;
+                        Game.gameOver("Time's Up!");
+                        return;
+                    }
+                    if (this.timeLeft < 10000) this.el.classList.add('danger');
+                    this.el.innerText = this.format(this.timeLeft);
+                } else {
+                    const multiplier = (!Game.is2D) ? 1 : (CONST.SPEED_2D / CONST.SPEED_3D);
+                    this.elapsed += delta * multiplier;
+                    this.el.innerText = this.format(this.elapsed);
+                }
             },
             format(ms) {
-                const totalSecs = Math.floor(ms / 1000);
+                const totalSecs = Math.ceil(ms / 1000);
                 const m = Math.floor(totalSecs / 60).toString().padStart(2, '0');
                 const s = (totalSecs % 60).toString().padStart(2, '0');
                 return `${m}:${s}`;
@@ -677,24 +841,18 @@
                 if(this.initialized) return; this.initialized = true;
                 const k = (e,v) => {
                     const key = e.key.toLowerCase();
-                    // Movement
                     if(key==='w'||key==='arrowup') this.keys.w=v; if(key==='s'||key==='arrowdown') this.keys.s=v;
                     if(key==='a'||key==='arrowleft') this.keys.l=v; if(key==='d'||key==='arrowright') this.keys.r=v;
                     
                     if (v) {
-                        // Global Esc
                         if(key === 'escape') {
                             if(Game.running) Game.quit();
                             if(!document.getElementById('screen-editor').classList.contains('hidden')) Editor.close();
                         }
-
-                        // Game Shortcuts
                         if (Game.running) {
                             if (key === 'm') Game.toggleDimension();
                             if (key === 'v') Game.toggleCamera();
                         }
-
-                        // Menu Navigation (Only if menu is visible)
                         const menu = document.getElementById('screen-menu');
                         if (!menu.classList.contains('hidden')) {
                             if(key === 'arrowup') { MenuNav.move(-1); Sfx.click(); }
@@ -747,6 +905,33 @@
                         stack.push({x: next.x, y: next.y});
                     } else { stack.pop(); }
                 }
+                
+                // Add Escaping Routes (Braid the maze) for Ghost Mode
+                if (Game.mode === 'ghost') {
+                    for(let y = 1; y < h-1; y++) {
+                        for(let x = 1; x < w-1; x++) {
+                            if(map[y][x] === CONST.PATH) {
+                                let walls = 0;
+                                if(map[y-1][x] === CONST.WALL) walls++;
+                                if(map[y+1][x] === CONST.WALL) walls++;
+                                if(map[y][x-1] === CONST.WALL) walls++;
+                                if(map[y][x+1] === CONST.WALL) walls++;
+                                if(walls === 3 && rng() < 0.2) {
+                                    const neighbors = [];
+                                    if(y>1 && map[y-2][x]===CONST.PATH) neighbors.push({x:x, y:y-1});
+                                    if(y<h-2 && map[y+2][x]===CONST.PATH) neighbors.push({x:x, y:y+1});
+                                    if(x>1 && map[y][x-2]===CONST.PATH) neighbors.push({x:x-1, y:y});
+                                    if(x<w-2 && map[y][x+2]===CONST.PATH) neighbors.push({x:x+1, y:y});
+                                    if(neighbors.length > 0) {
+                                        const n = neighbors[Math.floor(rng()*neighbors.length)];
+                                        map[n.y][n.x] = CONST.PATH;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
                 const deadEnds = [];
                 for(let y = 1; y < h - 1; y++) {
                     for(let x = 1; x < w - 1; x++) {
@@ -774,34 +959,75 @@
             }
         };
 
+        const Pathfinding = {
+            findPath(map, start, end, w, h) {
+                const openSet = [{x: start.x, y: start.y, f: 0, g: 0, p: null}];
+                const closedSet = new Set();
+                while (openSet.length > 0) {
+                    let lowestIndex = 0;
+                    for(let i=1; i<openSet.length; i++) if(openSet[i].f < openSet[lowestIndex].f) lowestIndex = i;
+                    const current = openSet[lowestIndex];
+                    if (Math.abs(current.x - end.x) < 0.5 && Math.abs(current.y - end.y) < 0.5) {
+                        const path = [];
+                        let temp = current;
+                        while(temp.p) { path.push({x:temp.x, y:temp.y}); temp = temp.p; }
+                        return path.reverse();
+                    }
+                    openSet.splice(lowestIndex, 1);
+                    closedSet.add(`${current.x},${current.y}`);
+                    const neighbors = [
+                        {x: current.x+1, y: current.y}, {x: current.x-1, y: current.y},
+                        {x: current.x, y: current.y+1}, {x: current.x, y: current.y-1}
+                    ];
+                    for(let n of neighbors) {
+                        if(n.x<0||n.x>=w||n.y<0||n.y>=h||map[n.y][n.x]===CONST.WALL) continue;
+                        if(closedSet.has(`${n.x},${n.y}`)) continue;
+                        const gScore = current.g + 1;
+                        let neighborNode = openSet.find(node => node.x === n.x && node.y === n.y);
+                        if(!neighborNode) {
+                            neighborNode = {
+                                x: n.x, y: n.y, g: gScore, 
+                                h: Math.abs(n.x - end.x) + Math.abs(n.y - end.y),
+                                p: current
+                            };
+                            neighborNode.f = neighborNode.g + neighborNode.h;
+                            openSet.push(neighborNode);
+                        } else if (gScore < neighborNode.g) {
+                            neighborNode.g = gScore;
+                            neighborNode.p = current;
+                            neighborNode.f = neighborNode.g + neighborNode.h;
+                        }
+                    }
+                }
+                return []; 
+            }
+        };
+
         const GFX = {
             scene: null, camera: null, renderer: null, wallsMesh: null,
-            wallTex: null, floorTex: null, playerMesh: null,
+            wallTex: null, floorTex: null, playerMesh: null, ghostMesh: null,
+            ambientLight: null,
             init() {
                 if(this.renderer) return;
                 const cvs = document.getElementById('c3d');
                 this.renderer = new THREE.WebGLRenderer({ canvas: cvs, antialias: false });
                 this.renderer.setSize(window.innerWidth, window.innerHeight);
                 this.scene = new THREE.Scene();
-                this.scene.background = new THREE.Color(0x020617);
-                this.scene.fog = new THREE.Fog(0x020617, 2, 20);
-                this.camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.1, 100);
                 
-                // Add Lights & Mark as Persistent
-                const ambient = new THREE.AmbientLight(0xffffff, 0.4);
-                ambient.userData.keep = true;
-                this.scene.add(ambient);
+                // Initialize lights
+                this.ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+                this.ambientLight.userData.keep = true;
+                this.scene.add(this.ambientLight);
 
-                this.pl = new THREE.PointLight(0x38bdf8, 1.5, 12);
+                this.pl = new THREE.PointLight(0xffffff, 1.0, 15);
                 this.pl.userData.keep = true;
                 this.scene.add(this.pl);
                 
-                // Camera is naturally persistent
+                this.camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.1, 100);
                 this.camera.userData.keep = true;
 
-                // Textures
-                this.wallTex = TexGen.createWall();
-                this.floorTex = TexGen.createFloor();
+                // Load initial theme settings
+                this.applyTheme();
 
                 window.addEventListener('resize', () => {
                     this.camera.aspect = window.innerWidth / window.innerHeight;
@@ -809,27 +1035,72 @@
                     this.renderer.setSize(window.innerWidth, window.innerHeight);
                 });
             },
+            applyTheme() {
+                const t = Theme.get();
+                if(!this.scene) return;
+                
+                this.scene.background = new THREE.Color(t.bg);
+                this.scene.fog = new THREE.Fog(t.fog, 2, 20);
+                if(this.ambientLight) this.ambientLight.intensity = t.ambient;
+                document.body.style.backgroundColor = t.cssBg;
+
+                // Generate new textures
+                if(Theme.current === 'night') {
+                    this.wallTex = TexGen.createTechWall();
+                    this.floorTex = TexGen.createTechFloor();
+                } else {
+                    this.wallTex = TexGen.createHedgeWall();
+                    this.floorTex = TexGen.createGrassFloor();
+                }
+
+                // If meshes exist, update their materials
+                if(this.wallsMesh) this.wallsMesh.material.map = this.wallTex;
+                // Floor is a separate mesh usually
+                const floorObj = this.scene.children.find(c => c.geometry && c.geometry.type === 'PlaneGeometry');
+                if(floorObj) floorObj.material.map = this.floorTex;
+            },
             createPlayer() {
                 const group = new THREE.Group();
-                // Body
                 const bodyGeo = new THREE.BoxGeometry(1, 1.8, 1);
                 const bodyMat = new THREE.MeshLambertMaterial({ color: 0x22d3ee });
                 const body = new THREE.Mesh(bodyGeo, bodyMat);
                 body.position.y = 0.9;
                 group.add(body);
-                // Visor
                 const visorGeo = new THREE.BoxGeometry(0.8, 0.4, 0.2);
                 const visorMat = new THREE.MeshLambertMaterial({ color: 0x000000 });
                 const visor = new THREE.Mesh(visorGeo, visorMat);
-                visor.position.set(0, 1.4, -0.5); // Facing Negative Z
+                visor.position.set(0, 1.4, -0.5); 
                 group.add(visor);
+                return group;
+            },
+            createGhost() {
+                const group = new THREE.Group();
+                const bodyGeo = new THREE.SphereGeometry(0.7, 16, 16);
+                const bodyMat = new THREE.MeshLambertMaterial({ color: 0xffffff, transparent: true, opacity: 0.8 });
+                const body = new THREE.Mesh(bodyGeo, bodyMat);
+                body.position.y = 1.2;
+                group.add(body);
+                
+                const eyeGeo = new THREE.SphereGeometry(0.15, 8, 8);
+                const eyeMat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+                const leftEye = new THREE.Mesh(eyeGeo, eyeMat);
+                leftEye.position.set(-0.25, 1.3, -0.6);
+                const rightEye = new THREE.Mesh(eyeGeo, eyeMat);
+                rightEye.position.set(0.25, 1.3, -0.6);
+                group.add(leftEye); group.add(rightEye);
+                
+                const light = new THREE.PointLight(0xff0000, 1, 6);
+                light.position.y = 1.2;
+                group.add(light);
                 
                 return group;
             },
             build(map, w, h) {
                 if (!this.scene) this.init();
                 
-                // Cleanup: Remove objects that are NOT marked as 'keep'
+                // Ensure theme is applied to new textures
+                this.applyTheme();
+
                 for(let i = this.scene.children.length - 1; i >= 0; i--) {
                      const c = this.scene.children[i];
                      if(!c.userData.keep) { 
@@ -839,11 +1110,16 @@
                      }
                 }
                 
-                // Player Mesh
                 this.playerMesh = this.createPlayer();
                 this.scene.add(this.playerMesh);
 
-                // Floor (moved from y=-2 to y=0)
+                if (Game.mode === 'ghost') {
+                    this.ghostMesh = this.createGhost();
+                    this.scene.add(this.ghostMesh);
+                } else {
+                    this.ghostMesh = null;
+                }
+
                 const floorGeo = new THREE.PlaneGeometry(w*4, h*4);
                 this.floorTex.repeat.set(w/2, h/2);
                 const floorMat = new THREE.MeshLambertMaterial({ map: this.floorTex });
@@ -852,7 +1128,6 @@
                 floor.position.set(w*2, 0, h*2); 
                 this.scene.add(floor);
 
-                // Walls
                 const wallCount = map.flat().filter(c => c === CONST.WALL).length;
                 const geo = new THREE.BoxGeometry(4, 4, 4);
                 const mat = new THREE.MeshLambertMaterial({ map: this.wallTex });
@@ -881,44 +1156,29 @@
                 this.scene.add(this.wallsMesh);
             },
             
-            // --- PHYSICS CAMERA CLIP ---
             getSafeCameraPos(px, pz, tx, tz, map, w, h) {
-                // Raycast-lite: Check points along the line from Player to Target
                 const dx = tx - px;
                 const dz = tz - pz;
                 const dist = Math.sqrt(dx*dx + dz*dz);
-                const steps = Math.ceil(dist * 2); // Check every 0.5 units
-                
-                // Buffer to keep camera slightly away from wall
-                const buffer = 0.5;
-
+                const steps = Math.ceil(dist * 2); 
                 for(let i = 1; i <= steps; i++) {
                     const t = i / steps;
                     const cx = px + dx * t;
                     const cz = pz + dz * t;
-                    
-                    // Convert World Coords (units) to Grid Coords
-                    // Map scale is 4 units per cell.
                     const gx = Math.floor(cx / 4);
                     const gz = Math.floor(cz / 4);
-                    
                     if (gx >= 0 && gx < w && gz >= 0 && gz < h) {
                         if (map[gz][gx] === CONST.WALL) {
-                            // Hit a wall! Return position just before this step
                             const safeT = Math.max(0, (i - 1.5) / steps);
-                            return { 
-                                x: px + dx * safeT, 
-                                z: pz + dz * safeT 
-                            };
+                            return { x: px + dx * safeT, z: pz + dz * safeT };
                         }
                     }
                 }
                 return { x: tx, z: tz };
             },
 
-            snapCamera: true, // Flag to reset lerp
-            render(player, is2D, isThirdPerson) {
-                // Update Player Mesh Position
+            snapCamera: true,
+            render(player, is2D, isThirdPerson, ghost) {
                 const px = player.x * 4;
                 const pz = player.z * 4;
                 
@@ -928,51 +1188,55 @@
                     this.playerMesh.visible = isThirdPerson;
                 }
 
-                // Camera Logic
+                if (this.ghostMesh && ghost) {
+                    const gx = ghost.x * 4;
+                    const gz = ghost.z * 4;
+                    this.ghostMesh.position.set(gx, 0, gz);
+                    this.ghostMesh.position.y = 1.2 + Math.sin(Date.now() * 0.005) * 0.3;
+                    this.ghostMesh.lookAt(px, 1.2, pz);
+                }
+
                 if (!is2D) {
                     if (isThirdPerson) {
-                        // Smooth Third Person Camera with Wall Clipping Fix
                         const dist = 10;
                         const height = 10;
-                        
-                        // Ideal Position (Behind Player)
                         let targetX = px + Math.sin(player.dir) * dist;
                         let targetZ = pz + Math.cos(player.dir) * dist;
-                        
-                        // Check for walls between Player and Ideal Camera Position
                         const safePos = this.getSafeCameraPos(px, pz, targetX, targetZ, Game.map, Game.w, Game.h);
-                        targetX = safePos.x;
-                        targetZ = safePos.z;
-
+                        targetX = safePos.x; targetZ = safePos.z;
                         if (this.snapCamera) {
                             this.camera.position.set(targetX, height, targetZ);
                             this.snapCamera = false;
                         } else {
-                            // Lerp for smoothness
                             const idealPos = new THREE.Vector3(targetX, height, targetZ);
                             this.camera.position.lerp(idealPos, 0.1);
                         }
                         this.camera.lookAt(px, 1, pz); 
                     } else {
-                        // First Person (Snappy)
                         this.camera.position.set(px, 1.6, pz);
                         const tx = px - Math.sin(player.dir);
                         const tz = pz - Math.cos(player.dir);
                         this.camera.lookAt(tx, 1.6, tz);
                         this.snapCamera = true; 
                     }
-                    
                     this.pl.position.set(px, 5, pz);
                     this.renderer.render(this.scene, this.camera);
                 }
             },
-            render2D(map, w, h, p, cvsId) {
+            render2D(map, w, h, p, ghost, cvsId) {
                 const cvs = document.getElementById(cvsId);
                 const ctx = cvs.getContext('2d');
                 const isMini = cvsId === 'minimap';
+                
+                // Use theme colors for 2D map
+                const t = Theme.get();
+                const bg = Theme.current === 'day' ? '#e0f2fe' : '#020617'; // Light Blue vs Dark
+                const wallColor = Theme.current === 'day' ? '#15803d' : '#475569'; // Green vs Slate
+                const floorColor = Theme.current === 'day' ? '#86efac' : '#0f172a'; // Light Green vs Dark Slate
+
                 if(!isMini) {
                     if(cvs.width !== window.innerWidth) { cvs.width=window.innerWidth; cvs.height=window.innerHeight; }
-                    ctx.fillStyle = '#020617'; ctx.fillRect(0,0,cvs.width,cvs.height);
+                    ctx.fillStyle = bg; ctx.fillRect(0,0,cvs.width,cvs.height);
                 } else {
                     const wrapper = document.getElementById('minimap-wrapper');
                     if(cvs.width !== wrapper.clientWidth || cvs.height !== wrapper.clientHeight) {
@@ -986,11 +1250,33 @@
                 const scale = Math.min(sw/w, sh/h);
                 const ox = (cvs.width - w*scale)/2;
                 const oy = (cvs.height - h*scale)/2;
+                
                 for(let z=0; z<h; z++) for(let x=0; x<w; x++) {
-                    const t = map[z][x];
-                    if(isMini && t!==CONST.WALL && t!==CONST.END && t!==CONST.START) continue;
-                    this.drawCell(ctx, t, ox+x*scale, oy+z*scale, scale);
+                    const type = map[z][x];
+                    if(isMini && type!==CONST.WALL && type!==CONST.END && type!==CONST.START) continue;
+                    
+                    if(type===CONST.WALL) ctx.fillStyle = wallColor;
+                    else if(type===CONST.END) ctx.fillStyle = '#ef4444';
+                    else if(type===CONST.START) ctx.fillStyle = '#10b981';
+                    else if(type===CONST.PATH && !isMini) ctx.fillStyle = floorColor;
+                    else continue;
+                    
+                    ctx.fillRect(ox+x*scale, oy+z*scale, scale+0.5, scale+0.5);
                 }
+                
+                // --- GHOST FIX: Remove scale/2 offset ---
+                if (Game.mode === 'ghost' && ghost) {
+                    const gx = ox + ghost.x*scale;
+                    const gy = oy + ghost.z*scale;
+                    ctx.fillStyle = 'rgba(255, 0, 0, 0.7)';
+                    ctx.beginPath(); 
+                    // gx/gy are already centered coordinates because ghost.x/z are fractional (e.g. 1.5)
+                    // and ox starts at index 0. So ox + 1.5*scale puts us exactly in the middle of cell 1.
+                    ctx.arc(gx, gy, scale/3, 0, Math.PI*2); 
+                    ctx.fill();
+                }
+                // ----------------------------------------
+
                 const px = ox + p.x*scale; const py = oy + p.z*scale;
                 ctx.save();
                 ctx.translate(px, py);
@@ -998,35 +1284,187 @@
                 ctx.fillStyle = '#fbbf24';
                 ctx.beginPath(); ctx.moveTo(0, -scale*0.7); ctx.lineTo(scale*0.4, scale*0.5); ctx.lineTo(0, scale*0.3); ctx.lineTo(-scale*0.4, scale*0.5); ctx.fill();
                 ctx.restore();
-            },
-            drawCell(ctx, t, x, y, s) {
-                if(t===CONST.WALL) ctx.fillStyle = '#475569';
-                else if(t===CONST.END) ctx.fillStyle = '#ef4444';
-                else if(t===CONST.START) ctx.fillStyle = '#10b981';
-                else if(t===CONST.PATH && ctx.canvas.id !== 'minimap') ctx.fillStyle = '#0f172a';
-                else return;
-                ctx.fillRect(x,y,s+0.5,s+0.5);
+            }
+        };
+
+        const UI = {
+            applyTheme() {
+                const mode = Theme.current;
+                const isDay = mode === 'day';
+                
+                // Toggle Body Class
+                document.body.classList.toggle('theme-day', isDay);
+
+                // Main Menu
+                const menu = document.getElementById('screen-menu');
+                if (isDay) {
+                    menu.classList.remove('bg-slate-950/95');
+                    menu.classList.add('bg-slate-100/85'); // More transparent background for light mode
+                } else {
+                    menu.classList.remove('bg-slate-100/85');
+                    menu.classList.add('bg-slate-950/95');
+                }
+
+                // Editor BG
+                const editor = document.getElementById('screen-editor');
+                if (isDay) {
+                    editor.classList.remove('bg-slate-950');
+                    editor.classList.add('bg-sky-50');
+                } else {
+                    editor.classList.remove('bg-sky-50');
+                    editor.classList.add('bg-slate-950');
+                }
+
+                // Editor Sidebar
+                const sidebar = document.getElementById('editor-sidebar');
+                const header = document.getElementById('editor-header');
+                if (isDay) {
+                    sidebar.classList.remove('bg-slate-900', 'border-slate-800');
+                    sidebar.classList.add('bg-white', 'border-slate-200');
+                    header.classList.remove('bg-slate-900', 'border-slate-800');
+                    header.classList.add('bg-white', 'border-slate-200');
+                    
+                    // Update header text color
+                    header.querySelector('h2').classList.remove('text-slate-100');
+                    header.querySelector('h2').classList.add('text-slate-800');
+                    
+                    // Update Back button styling for day
+                    const backBtn = document.getElementById('btn-editor-back');
+                    backBtn.classList.remove('bg-slate-800', 'text-slate-300', 'hover:text-white', 'hover:bg-slate-700', 'border-slate-700');
+                    backBtn.classList.add('bg-white', 'text-slate-600', 'hover:text-slate-900', 'hover:bg-slate-50', 'border-slate-300');
+
+                } else {
+                    sidebar.classList.remove('bg-white', 'border-slate-200');
+                    sidebar.classList.add('bg-slate-900', 'border-slate-800');
+                    header.classList.remove('bg-white', 'border-slate-200');
+                    header.classList.add('bg-slate-900', 'border-slate-800');
+                    
+                    header.querySelector('h2').classList.remove('text-slate-800');
+                    header.querySelector('h2').classList.add('text-slate-100');
+
+                    const backBtn = document.getElementById('btn-editor-back');
+                    backBtn.classList.remove('bg-white', 'text-slate-600', 'hover:text-slate-900', 'hover:bg-slate-50', 'border-slate-300');
+                    backBtn.classList.add('bg-slate-800', 'text-slate-300', 'hover:text-white', 'hover:bg-slate-700', 'border-slate-700');
+                }
+
+                // Editor Tools BG
+                const toolsBg = document.getElementById('editor-tools-bg');
+                const genBox = document.getElementById('editor-gen-box');
+                const inputs = document.querySelectorAll('#editor-gen-box input, #editor-gen-box select');
+                
+                if (isDay) {
+                    toolsBg.classList.remove('bg-slate-950', 'border-slate-800');
+                    toolsBg.classList.add('bg-slate-100', 'border-slate-200');
+                    
+                    genBox.classList.remove('bg-slate-950', 'border-slate-800');
+                    genBox.classList.add('bg-slate-100', 'border-slate-200');
+                    
+                    inputs.forEach(el => {
+                        el.classList.remove('bg-slate-900', 'border-slate-700', 'text-white', 'text-slate-300');
+                        el.classList.add('bg-white', 'border-slate-300', 'text-slate-800');
+                    });
+                } else {
+                    toolsBg.classList.remove('bg-slate-100', 'border-slate-200');
+                    toolsBg.classList.add('bg-slate-950', 'border-slate-800');
+                    
+                    genBox.classList.remove('bg-slate-100', 'border-slate-200');
+                    genBox.classList.add('bg-slate-950', 'border-slate-800');
+                    
+                    inputs.forEach(el => {
+                        el.classList.remove('bg-white', 'border-slate-300', 'text-slate-800');
+                        el.classList.add('bg-slate-900', 'border-slate-700', 'text-white');
+                    });
+                }
+
+                // Modal Boxes (Victory / Game Over)
+                const victoryBox = document.getElementById('box-victory');
+                const gameoverBox = document.getElementById('box-gameover');
+                const vicTitle = document.getElementById('victory-title');
+                const goTitle = document.getElementById('gameover-title');
+                const vicTime = document.getElementById('victory-time');
+
+                if (isDay) {
+                    // Light Mode Modals
+                    [victoryBox, gameoverBox].forEach(b => {
+                        b.classList.remove('bg-slate-900', 'border-yellow-500/20', 'border-red-500/50');
+                        b.classList.add('bg-white', 'border-slate-200', 'shadow-xl');
+                    });
+                    vicTitle.classList.remove('text-white'); vicTitle.classList.add('text-slate-800');
+                    goTitle.classList.remove('text-white'); goTitle.classList.add('text-slate-800');
+                    
+                    vicTime.classList.remove('bg-slate-950', 'text-cyan-400', 'border-slate-800');
+                    vicTime.classList.add('bg-slate-100', 'text-cyan-600', 'border-slate-200');
+                } else {
+                    // Dark Mode Modals
+                    [victoryBox, gameoverBox].forEach(b => {
+                        b.classList.remove('bg-white', 'border-slate-200', 'shadow-xl');
+                        b.classList.add('bg-slate-900');
+                    });
+                    victoryBox.classList.add('border-yellow-500/20');
+                    gameoverBox.classList.add('border-red-500/50');
+                    
+                    vicTitle.classList.remove('text-slate-800'); vicTitle.classList.add('text-white');
+                    goTitle.classList.remove('text-slate-800'); goTitle.classList.add('text-white');
+                    
+                    vicTime.classList.remove('bg-slate-100', 'text-cyan-600', 'border-slate-200');
+                    vicTime.classList.add('bg-slate-950', 'text-cyan-400', 'border-slate-800');
+                }
             }
         };
 
         const Game = {
-            running: false, is2D: false, isThirdPerson: false, 
+            running: false, is2D: false, isThirdPerson: false, mode: 'standard',
             map: [], w: 0, h: 0,
             player: { x:1, z:1, dir: Math.PI },
-            stepTimer: 0,
+            ghost: { x:1, z:1, path: [], timer: 0 },
+            stepTimer: 0, lastTime: 0,
 
             init() {
                 Input.init(); GFX.init(); Timer.init(); this.loop();
-                MenuNav.init(); // Init keyboard menu
+                MenuNav.init(); 
                 document.querySelectorAll('button').forEach(b => b.addEventListener('click', () => Sfx.click()));
                 document.getElementById('inp-code').addEventListener('keyup', (e)=>{ if(e.key === 'Enter') this.start('code'); });
             },
-            start(mode) {
+            toggleTheme() {
+                const mode = Theme.toggle();
+                const icon = document.getElementById('icon-theme');
+                if(mode === 'day') {
+                    icon.className = "ph ph-sun text-yellow-500";
+                } else {
+                    icon.className = "ph ph-moon text-yellow-400";
+                }
+                GFX.applyTheme();
+                UI.applyTheme();
+            },
+            setMode(m) {
+                this.mode = m;
+                document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+                document.getElementById(`mode-${m}`).classList.add('active');
+            },
+            spawnGhost(startX, startZ, endX, endZ) {
+                let bestPos = {x: 1, y: 1};
+                let maxDist = -1;
+                for(let y=1; y<this.h-1; y++) {
+                    for(let x=1; x<this.w-1; x++) {
+                        if(this.map[y][x] !== CONST.WALL) {
+                            const dStart = Math.abs(x - startX) + Math.abs(y - startZ);
+                            const dEnd = Math.abs(x - endX) + Math.abs(y - endZ);
+                            const score = Math.min(dStart, dEnd);
+                            if(score > maxDist) { maxDist = score; bestPos = {x, y}; }
+                        }
+                    }
+                }
+                this.ghost.x = bestPos.x + 0.5;
+                this.ghost.z = bestPos.y + 0.5;
+                this.ghost.path = [];
+                this.ghost.timer = 0;
+            },
+            start(difficulty) {
                 Sfx.init(); 
-                if (!GFX.scene) this.init(); 
+                if (!GFX.scene) GFX.init(); 
                 let w=15, h=15; let rng = Math.random;
-                Timer.reset();
-                if (mode === 'code') {
+                
+                if (difficulty === 'code') {
                     const rawCode = document.getElementById('inp-code').value.trim();
                     const sizeVal = parseInt(document.getElementById('inp-size').value);
                     if(!rawCode) return alert("Please enter a code!");
@@ -1037,33 +1475,41 @@
                 } else {
                     Seed.reset();
                     document.getElementById('ui-code-display').classList.add('hidden');
-                    if(mode==='easy'){w=11;h=11;} 
-                    if(mode==='medium'){w=25;h=25;} 
-                    if(mode==='hard'){w=51;h=51;}
-                    if(mode==='extreme'){w=101;h=101;} // 100x100 (Odd numbers for generator)
+                    if(difficulty==='easy'){w=11;h=11;} 
+                    if(difficulty==='medium'){w=25;h=25;} 
+                    if(difficulty==='hard'){w=51;h=51;}
+                    if(difficulty==='extreme'){w=101;h=101;}
                 }
-                if(mode==='custom') { this.map=JSON.parse(JSON.stringify(Editor.grid)); this.w=this.map[0].length; this.h=this.map.length; } 
+                
+                if(difficulty==='custom') { this.map=JSON.parse(JSON.stringify(Editor.grid)); this.w=this.map[0].length; this.h=this.map.length; } 
                 else { this.map = MazeGen.generate(w, h, rng); this.w=w; this.h=h; }
+                
                 let found=false;
                 for(let z=0;z<this.h;z++) for(let x=0;x<this.w;x++) if(this.map[z][x]===CONST.START) { this.player.x=x+0.5; this.player.z=z+0.5; found=true; }
                 if(!found){this.player.x=1.5;this.player.z=1.5;}
-                
+
                 const startX = Math.floor(this.player.x);
                 const startZ = Math.floor(this.player.z);
+                let endX=1, endZ=1;
+                for(let z=0;z<this.h;z++) for(let x=0;x<this.w;x++) if(this.map[z][x]===CONST.END) { endX=x; endZ=z; }
                 
-                const isPath = (x, z) => {
-                    if (x < 0 || x >= this.w || z < 0 || z >= this.h) return false;
-                    return this.map[z][x] !== CONST.WALL;
-                };
-
+                const isPath = (x, z) => (x>=0 && x<this.w && z>=0 && z<this.h && this.map[z][x] !== CONST.WALL);
                 let startDir = Math.PI;
-
                 if (isPath(startX, startZ - 1)) startDir = 0;           
                 else if (isPath(startX, startZ + 1)) startDir = Math.PI; 
                 else if (isPath(startX - 1, startZ)) startDir = Math.PI/2; 
                 else if (isPath(startX + 1, startZ)) startDir = -Math.PI/2; 
-
                 this.player.dir = startDir;
+
+                if (this.mode === 'ghost') {
+                    this.spawnGhost(startX, startZ, endX, endZ);
+                }
+                
+                let limit = 0;
+                if (this.mode === 'time') {
+                    limit = Math.floor((w * h) / 3); 
+                    if (limit < 30) limit = 30; 
+                }
 
                 GFX.build(this.map, this.w, this.h);
                 document.querySelectorAll('.ui-screen').forEach(e => e.classList.add('hidden'));
@@ -1075,7 +1521,7 @@
                 GFX.snapCamera = true;
                 
                 this.running=true;
-                Timer.start(); 
+                Timer.start(this.mode, limit);
                 this.lastTime = Date.now();
                 this.updateUI();
             },
@@ -1118,25 +1564,54 @@
                 
                 document.getElementById('controls-ui').style.display = isMobile ? 'block' : 'none';
             },
+            updateGhost(dt) {
+                if (this.mode !== 'ghost') return;
+                
+                this.ghost.timer += dt;
+                if (this.ghost.timer > 0.5) {
+                    this.ghost.timer = 0;
+                    const startNode = {x: Math.floor(this.ghost.x), y: Math.floor(this.ghost.z)};
+                    const endNode = {x: Math.floor(this.player.x), y: Math.floor(this.player.z)};
+                    this.ghost.path = Pathfinding.findPath(this.map, startNode, endNode, this.w, this.h);
+                }
+
+                if (this.ghost.path && this.ghost.path.length > 0) {
+                    const target = this.ghost.path[0];
+                    const tx = target.x + 0.5;
+                    const tz = target.y + 0.5;
+                    
+                    const dx = tx - this.ghost.x;
+                    const dz = tz - this.ghost.z;
+                    const dist = Math.sqrt(dx*dx + dz*dz);
+                    
+                    if (dist < 0.1) {
+                        this.ghost.path.shift(); 
+                    } else {
+                        const moveDist = CONST.GHOST_SPEED * dt;
+                        this.ghost.x += (dx / dist) * moveDist;
+                        this.ghost.z += (dz / dist) * moveDist;
+                    }
+                }
+                
+                const pdx = this.player.x - this.ghost.x;
+                const pdz = this.player.z - this.ghost.z;
+                if (Math.sqrt(pdx*pdx + pdz*pdz) < 0.8) {
+                    this.gameOver("Ghost Caught You!");
+                }
+            },
             loop() {
                 requestAnimationFrame(()=>this.loop());
                 if(!this.running) return;
                 
-                // --- DELTA TIME CALCULATION ---
                 const now = Date.now();
-                // Calculate time in seconds (max 0.1s to prevent huge jumps if lag occurs)
                 const dt = Math.min((now - this.lastTime) / 1000, 0.1); 
                 this.lastTime = now;
-                // -----------------------------
 
                 const input = Input.get(!this.is2D);
                 
                 if(!this.is2D) {
-                    // Multiply rotation by dt
                     this.player.dir += input.rot * CONST.ROT_SPEED * dt;
-                    
                     if(Math.abs(input.dz) > 0.05) {
-                        // Multiply speed by dt
                         const speed = input.dz * CONST.SPEED_3D * dt;
                         const dx = -Math.sin(this.player.dir) * speed;
                         const dz = -Math.cos(this.player.dir) * speed;
@@ -1149,7 +1624,6 @@
                     }
                 } else {
                     if(Math.abs(input.dx)>0.05 || Math.abs(input.dz)>0.05) {
-                        // Multiply speed by dt
                         const dx = input.dx * CONST.SPEED_2D * dt;
                         const dz = input.dz * CONST.SPEED_2D * dt;
                         this.move(dx, dz);
@@ -1157,10 +1631,10 @@
                     }
                 }
                 
-                // ... rest of the function remains the same ...
+                this.updateGhost(dt);
+
                 const gx=Math.floor(this.player.x), gz=Math.floor(this.player.z);
                 if(this.map[gz][gx]===CONST.END) {
-                    // ... win condition code ...
                     this.running=false;
                     const finalTime = Timer.stop();
                     document.getElementById('victory-time').innerText = finalTime;
@@ -1170,64 +1644,40 @@
                     document.getElementById('controls-ui').style.display='none';
                     Sfx.win();
                 }
+                
                 if(!this.is2D) { 
-                    GFX.render(this.player, this.is2D, this.isThirdPerson); 
-                    GFX.render2D(this.map, this.w, this.h, this.player, 'minimap'); 
+                    GFX.render(this.player, this.is2D, this.isThirdPerson, this.ghost); 
+                    GFX.render2D(this.map, this.w, this.h, this.player, this.ghost, 'minimap'); 
                 } else {
-                    GFX.render2D(this.map, this.w, this.h, this.player, 'c2d');
+                    GFX.render2D(this.map, this.w, this.h, this.player, this.ghost, 'c2d');
                 }
             },
-            // --- UPDATED PHYSICS MOVE ---
             move(dx, dz) {
-                // Independent axis check for sliding
                 let nextX = this.player.x + dx;
                 let nextZ = this.player.z + dz;
-
-                // 1. Try X movement
                 if (!this.col(nextX, this.player.z)) {
                     this.player.x = nextX;
                 } else {
-                    // Wall Slide/Corner Assist: If blocked on X, check if we are near a corner on Z
-                    // This helps round corners smoothly if the player is slightly misaligned
-                    // Only apply if NOT trying to move Z this frame (pure rotation or slight drift)
                     if (Math.abs(dz) < 0.01) {
                          const gridZ = Math.floor(this.player.z);
                          const distToTop = this.player.z - gridZ;
                          const distToBottom = (gridZ + 1) - this.player.z;
-                         
-                         // If very close to top edge and top neighbor is open, nudge up
-                         if (distToTop < 0.3 && !this.col(nextX, gridZ - 0.5)) {
-                             this.player.z -= 0.05;
-                         }
-                         // If very close to bottom edge and bottom neighbor is open, nudge down
-                         if (distToBottom < 0.3 && !this.col(nextX, gridZ + 1.5)) {
-                             this.player.z += 0.05;
-                         }
+                         if (distToTop < 0.3 && !this.col(nextX, gridZ - 0.5)) this.player.z -= 0.05;
+                         if (distToBottom < 0.3 && !this.col(nextX, gridZ + 1.5)) this.player.z += 0.05;
                     }
                 }
-
-                // 2. Try Z movement
                 if (!this.col(this.player.x, nextZ)) {
                     this.player.z = nextZ;
                 } else {
-                     // Same corner assist for Z blocked
                      if (Math.abs(dx) < 0.01) {
                          const gridX = Math.floor(this.player.x);
                          const distToLeft = this.player.x - gridX;
                          const distToRight = (gridX + 1) - this.player.x;
-                         
-                         if (distToLeft < 0.3 && !this.col(gridX - 0.5, nextZ)) {
-                             this.player.x -= 0.05;
-                         }
-                         if (distToRight < 0.3 && !this.col(gridX + 1.5, nextZ)) {
-                             this.player.x += 0.05;
-                         }
+                         if (distToLeft < 0.3 && !this.col(gridX - 0.5, nextZ)) this.player.x -= 0.05;
+                         if (distToRight < 0.3 && !this.col(gridX + 1.5, nextZ)) this.player.x += 0.05;
                      }
                 }
-                
-                // 3. Resolve overlap (Emergency push out)
                 if (this.col(this.player.x, this.player.z)) {
-                     // Push back towards center of current cell
                      const cx = Math.floor(this.player.x) + 0.5;
                      const cz = Math.floor(this.player.z) + 0.5;
                      this.player.x += (cx - this.player.x) * 0.1;
@@ -1236,20 +1686,24 @@
             },
             col(x, z) {
                 const r = CONST.COLLISION_RADIUS;
-                // Check all 4 corners of the bounding box
-                const points = [
-                    {x: x-r, z: z-r}, {x: x+r, z: z-r},
-                    {x: x-r, z: z+r}, {x: x+r, z: z+r}
-                ];
-                
+                const points = [{x: x-r, z: z-r}, {x: x+r, z: z-r}, {x: x-r, z: z+r}, {x: x+r, z: z+r}];
                 for(let p of points) {
                     const cx = Math.floor(p.x);
                     const cz = Math.floor(p.z);
-                    
                     if(cx < 0 || cx >= this.w || cz < 0 || cz >= this.h) return true;
                     if(this.map[cz][cx] === CONST.WALL) return true;
                 }
                 return false;
+            },
+            gameOver(reason) {
+                this.running = false;
+                Timer.stop();
+                Sfx.loss();
+                document.getElementById('fail-reason').innerText = reason;
+                document.getElementById('screen-gameover').classList.remove('hidden');
+                document.getElementById('screen-gameover').classList.add('flex');
+                document.getElementById('minimap-wrapper').style.display='none';
+                document.getElementById('controls-ui').style.display='none';
             },
             quit() {
                 this.running=false; Timer.reset();
@@ -1267,7 +1721,7 @@
                 document.getElementById('screen-menu').classList.add('hidden');
                 document.getElementById('screen-editor').classList.remove('hidden');
                 document.getElementById('screen-editor').classList.add('flex');
-                this.updateUI();
+                this.updateUI(); // FIX: Added call to updateUI to show correct button state
                 setTimeout(()=>this.render(), 10);
                 const vp = document.getElementById('editor-grid');
                 const handleStart = (e) => {
@@ -1359,11 +1813,8 @@
             getClass(t) { return t===1?'c-wall':t===3?'c-end':t===2?'c-start':'c-path'; },
             render() {
                 const el = document.getElementById('editor-grid');
-                const viewport = document.getElementById('editor-viewport');
                 el.innerHTML = '';
-                // No complex calc needed due to flex centering, just render grid
-                const cellSize = Math.floor(16 * this.zoom); // Base 16px * zoom
-                
+                const cellSize = Math.floor(16 * this.zoom); 
                 el.style.gridTemplateColumns = `repeat(${this.size}, ${cellSize}px)`;
                 el.style.width = 'fit-content'; 
                 const frag = document.createDocumentFragment();
