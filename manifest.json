@@ -1,6 +1,6 @@
 {
-  "name": "Mazemazing",
-  "short_name": "MazeMaster",
+  "name": "Maze Master 3D",
+  "short_name": "Mazemazing",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#020617",
