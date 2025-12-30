@@ -2,9 +2,9 @@ const CACHE_NAME = 'maze-master-v1';
 const ASSETS = [
   './',
   './index.html',
-  './icon.png',       // Make sure you have this file!
+  './icon.png',       // For Desktop/Windows
+  './icon.svg',       // For Mobile/Favicon (Added this!)
   './manifest.json'
-  // I REMOVED the external links (Tailwind, Three.js) to fix the crash.
 ];
 
 // Install Event: Cache files
