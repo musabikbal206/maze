@@ -40,6 +40,7 @@ const Lang = {
             code_label: "OR USE A CODE", load_map: "LOAD MAP", map_editor: "Map Editor",
             sound_on: "Sound On", sound_off: "Sound Off",
             exit: "Exit", view_3d: "3D View", view_2d: "2D Map", view_3rd: "3rd Person",
+            view_1st: "1st Person",
             back: "Back", play: "Play", draw: "DRAW", pan: "PAN",
             wall: "Wall", path: "Path", start: "Start", end: "End",
             prop_grid: "Grid Size", prop_zoom: "Zoom Level", gen_title: "Generator", gen: "GEN", clear: "CLEAR MAP",
@@ -51,6 +52,7 @@ const Lang = {
             code_label: "VEYA KOD KULLAN", load_map: "HARİTA YÜKLE", map_editor: "Harita Editörü",
             sound_on: "Ses Açık", sound_off: "Ses Kapalı",
             exit: "Çıkış", view_3d: "3D Görünüm", view_2d: "2D Harita", view_3rd: "3. Şahıs",
+            view_1st: "1. Şahıs",
             back: "Geri", play: "Oyna", draw: "ÇİZ", pan: "KAYDIR",
             wall: "Duvar", path: "Yol", start: "Başla", end: "Bitiş",
             prop_grid: "Izgara Boyutu", prop_zoom: "Yakınlaştırma", gen_title: "Oluşturucu", gen: "ÜRET", clear: "TEMİZLE",
@@ -284,7 +286,12 @@ const Timer = {
         this.update();
         this.interval = setInterval(() => this.update(), 100);
     },
-    stop() { this.running = false; clearInterval(this.interval); return this.format(this.elapsed); },
+    stop() { 
+        this.running = false; 
+        clearInterval(this.interval); 
+        // Checks if mode is 'time' to return the correct value
+        return this.format(this.mode === 'time' ? this.timeLeft : this.elapsed); 
+    },
     reset() { this.running = false; clearInterval(this.interval); this.elapsed = 0; this.el.style.display = 'none'; },
     update() {
         if(!this.running) return;
