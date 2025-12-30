@@ -422,9 +422,9 @@
         const CONST = {
             WALL: 1, PATH: 0, START: 2, END: 3,
             CELL_SIZE: 4, 
-            SPEED_3D: 0.01, 
-            SPEED_2D: 0.03, 
-            ROT_SPEED: 0.02, // Reduced rotation speed for better precision
+            SPEED_3D: 0.05, 
+            SPEED_2D: 0.15,
+            ROT_SPEED: 0.04, 
             COLLISION_RADIUS: 0.2
         };
 
@@ -879,7 +879,7 @@
                 this.scene.add(this.wallsMesh);
             },
             
-            // --- NEW: Physics based camera clipping check ---
+            // --- PHYSICS CAMERA CLIP ---
             getSafeCameraPos(px, pz, tx, tz, map, w, h) {
                 // Raycast-lite: Check points along the line from Player to Target
                 const dx = tx - px;
