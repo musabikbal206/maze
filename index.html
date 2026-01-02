@@ -310,10 +310,29 @@
         </div>
     </div>
     
+    <script>
+        document.addEventListener("contextmenu", function(event){
+        event.preventDefault();
+        });
+        
+        document.onkeydown = function(e) {
+            if (
+                (e.ctrlKey && e.keyCode === 85) || // Ctrl + U
+                (e.ctrlKey && e.shiftKey && e.keyCode === 73) || // Ctrl + Shift + I
+                (e.ctrlKey && e.shiftKey && e.keyCode === 74) || // Ctrl + Shift + J
+                (e.keyCode === 123) // F12
+            ) {
+                e.preventDefault(); // Crucial: This stops the browser's default action
+                return false;
+            }
+        }
+    </script>
+    
     <script src="script.js"></script>
 </body>
 
 </html>
+
 
 
 
