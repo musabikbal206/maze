@@ -340,57 +340,108 @@ const Seed = {
 };
 
 class Joystick {
-    constructor(zoneId, thumbId, maxDist = 40) {
-        this.zone = document.getElementById(zoneId); this.thumb = document.getElementById(thumbId);
-        this.maxDist = maxDist; this.active = false; this.data = { x: 0, y: 0 }; this.origin = { x: 0, y: 0 };
+    // CHANGED: maxDist increased to 150 for finer control (longer drag = smoother acceleration)
+    constructor(zoneId, maxDist = 150) {
+        this.zone = document.getElementById(zoneId);
+        this.maxDist = maxDist;
+        
+        this.data = { x: 0, y: 0 };
+        this.origin = { x: 0, y: 0 };
+        this.touchId = null;
+        
         this.bindEvents();
     }
+
     bindEvents() {
         const handleStart = (e) => {
-            e.preventDefault(); this.active = true;
-            const rect = this.zone.getBoundingClientRect();
-            this.origin = { x: rect.left + rect.width/2, y: rect.top + rect.height/2 };
-            this.update(e); this.zone.querySelector('.stick-base').style.borderColor = "rgba(34, 211, 238, 0.5)";
+            e.preventDefault();
+            if (this.touchId !== null) return;
+
+            const touch = e.changedTouches[0];
+            this.touchId = touch.identifier;
+
+            // Set anchor point
+            this.origin.x = touch.clientX;
+            this.origin.y = touch.clientY;
+
+            this.data = { x: 0, y: 0 };
         };
-        const handleMove = (e) => { if(!this.active) return; e.preventDefault(); this.update(e); };
+
+        const handleMove = (e) => {
+            if (this.touchId === null) return;
+            e.preventDefault();
+
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                if (e.changedTouches[i].identifier === this.touchId) {
+                    this.update(e.changedTouches[i]);
+                    break;
+                }
+            }
+        };
+
         const handleEnd = (e) => {
-            e.preventDefault(); this.active = false; this.data = {x:0, y:0};
-            this.thumb.style.transform = `translate(-50%, -50%)`;
-            this.zone.querySelector('.stick-base').style.borderColor = "";
+            if (this.touchId === null) return;
+            
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                if (e.changedTouches[i].identifier === this.touchId) {
+                    this.touchId = null;
+                    this.data = { x: 0, y: 0 };
+                    break;
+                }
+            }
         };
-        this.zone.addEventListener('touchstart', handleStart, {passive: false});
-        this.zone.addEventListener('touchmove', handleMove, {passive: false});
-        this.zone.addEventListener('touchend', handleEnd); this.zone.addEventListener('touchcancel', handleEnd);
+
+        this.zone.addEventListener('touchstart', handleStart, { passive: false });
+        this.zone.addEventListener('touchmove', handleMove, { passive: false });
+        this.zone.addEventListener('touchend', handleEnd);
+        this.zone.addEventListener('touchcancel', handleEnd);
     }
-    update(e) {
-        const touch = e.targetTouches ? e.targetTouches[0] : e;
-        const dx = touch.clientX - this.origin.x; const dy = touch.clientY - this.origin.y;
-        const dist = Math.sqrt(dx*dx + dy*dy); const angle = Math.atan2(dy, dx);
-        const clamped = Math.min(dist, this.maxDist);
-        const tx = Math.cos(angle) * clamped; const ty = Math.sin(angle) * clamped;
-        this.thumb.style.transform = `translate(calc(-50% + ${tx}px), calc(-50% + ${ty}px))`;
-        this.data.x = tx / this.maxDist; this.data.y = ty / this.maxDist;
+
+    update(touch) {
+        const dx = touch.clientX - this.origin.x;
+        const dy = touch.clientY - this.origin.y;
+        
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const angle = Math.atan2(dy, dx);
+        
+        const clampedDist = Math.min(dist, this.maxDist);
+        
+        // Intensity (0.0 to 1.0)
+        // With maxDist at 150, you have to drag quite far to hit 1.0
+        const intensity = clampedDist / this.maxDist;
+        
+        // Optional: Square the intensity for a "curved" response
+        // This makes small movements VERY slow, and big movements fast
+        // intensity = intensity * intensity; 
+        
+        this.data.x = Math.cos(angle) * intensity;
+        this.data.y = Math.sin(angle) * intensity;
     }
 }
 
 const Input = {
-    keys: { w:false, s:false, l:false, r:false }, stick: null, initialized: false,
+    keys: { w:false, s:false, l:false, r:false }, 
+    stick: null, initialized: false,
+
     init() {
         if(this.initialized) return; this.initialized = true;
+        
         const k = (e,v) => {
             const key = e.key.toLowerCase();
-            if(key==='w'||key==='arrowup') this.keys.w=v; if(key==='s'||key==='arrowdown') this.keys.s=v;
-            if(key==='a'||key==='arrowleft') this.keys.l=v; if(key==='d'||key==='arrowright') this.keys.r=v;
+            if(key==='w'||key==='arrowup') this.keys.w=v; 
+            if(key==='s'||key==='arrowdown') this.keys.s=v;
+            if(key==='a'||key==='arrowleft') this.keys.l=v; 
+            if(key==='d'||key==='arrowright') this.keys.r=v;
             
+            if (v && key === 'escape') {
+                if(Game.running) Game.quit();
+                if(!document.getElementById('screen-editor').classList.contains('hidden')) Editor.close();
+            }
+            if (v && Game.running) {
+                if (key === 'm') Game.toggleDimension();
+                if (key === 'v') Game.toggleCamera();
+            }
             if (v) {
-                if(key === 'escape') {
-                    if(Game.running) Game.quit();
-                    if(!document.getElementById('screen-editor').classList.contains('hidden')) Editor.close();
-                }
-                if (Game.running) {
-                    if (key === 'm') Game.toggleDimension();
-                    if (key === 'v') Game.toggleCamera();
-                }
                 const menu = document.getElementById('screen-menu');
                 if (!menu.classList.contains('hidden')) {
                     if(key === 'arrowup') { MenuNav.move(-1); Sfx.click(); }
@@ -399,12 +450,19 @@ const Input = {
                 }
             }
         };
-        window.addEventListener('keydown', e=>k(e,true)); window.addEventListener('keyup', e=>k(e,false));
-        if('ontouchstart' in window || navigator.maxTouchPoints > 0) { this.stick = new Joystick('stick-zone', 'stick-thumb'); } 
-        else { document.getElementById('controls-hint').classList.remove('hidden'); }
+        window.addEventListener('keydown', e=>k(e,true)); 
+        window.addEventListener('keyup', e=>k(e,false));
+        
+        if('ontouchstart' in window || navigator.maxTouchPoints > 0) { 
+            this.stick = new Joystick('controls-ui'); 
+        } else { 
+            document.getElementById('controls-hint').classList.remove('hidden'); 
+        }
     },
+
     get(is3D) {
         let dx = 0, dz = 0, rot = 0;
+        
         if (is3D) {
             if(this.keys.w) dz = 1; if(this.keys.s) dz = -1;
             if(this.keys.l) rot = 1; if(this.keys.r) rot = -1;
@@ -412,9 +470,20 @@ const Input = {
             if(this.keys.w) dz = -1; if(this.keys.s) dz = 1;
             if(this.keys.l) dx = -1; if(this.keys.r) dx = 1;
         }
-        if(this.stick && this.stick.active) {
-            const sx = this.stick.data.x; const sy = this.stick.data.y;
-            if(is3D) { dz = -sy; rot = -sx; } else { dx = sx; dz = sy; }
+
+        if(this.stick && this.stick.touchId !== null) {
+            const sx = this.stick.data.x; 
+            const sy = this.stick.data.y;
+            
+            if(is3D) { 
+                dz = -sy; 
+                // CHANGED: Reduced multiplier from 1.5 to 0.8
+                // This makes the rotation significantly slower and easier to control
+                rot = -sx * 0.8; 
+            } else { 
+                dx = sx; 
+                dz = sy; 
+            }
         }
         return { dx, dz, rot };
     }
