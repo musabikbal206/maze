@@ -8,12 +8,12 @@ if ('serviceWorker' in navigator) {
 const CONST = {
     WALL: 1, PATH: 0, START: 2, END: 3,
     CELL_SIZE: 4, 
-    SPEED_3D: 3.5, 
-    SPEED_2D: 10.0,
-    ROT_SPEED: 2.5, 
+    SPEED_3D: 3.0, 
+    SPEED_2D: 9.0,
+    ROT_SPEED: 2.7, 
     COLLISION_RADIUS: 0.2,
-    GHOST_SPEED: 1.8,
-    GHOST_SPEED_2D: 5.5, // Faster speed for 2D mode
+    GHOST_SPEED: 1.6,
+    GHOST_SPEED_2D: 5.0, // Faster speed for 2D mode
     TIME_PENALTY_2D: 3.0 // Time passes 3x faster in 2D
 };
 
