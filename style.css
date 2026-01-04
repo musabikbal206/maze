@@ -56,35 +56,31 @@ body.view-2d #game-timer:hover {
 @keyframes pulse-red { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
 
 /* Controls */
-#controls-ui { display: none; width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 50; pointer-events: none; }
-
-.stick-zone {
-    position: absolute; bottom: 40px; left: 40px; 
-    width: 140px; height: 140px;
-    pointer-events: auto;
+#controls-ui { 
+    display: none; 
+    width: 100%; 
+    height: 100%; 
+    position: absolute; 
+    top: 0; 
+    left: 0; 
+    
+    /* FIX: Lower Z-Index so buttons (z-20+) sit on top */
+    z-index: 10; 
+    
+    touch-action: none; 
 }
 
-.stick-base {
-    width: 100%; height: 100%;
-    background: rgba(255, 255, 255, 0.05);
-    border: 2px solid rgba(255, 255, 255, 0.15);
-    border-radius: 50%;
-    position: relative;
-    backdrop-filter: blur(4px);
-    transition: border-color 0.2s;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+/* Remove old joystick visual classes if you want to keep the file clean */
+.stick-zone, .stick-base, .stick-thumb {
+    display: none !important;
 }
 
-.stick-thumb {
-    width: 60px; height: 60px;
-    background: radial-gradient(circle at 30% 30%, #22d3ee, #0891b2);
-    border-radius: 50%;
-    position: absolute;
-    top: 50%; left: 50%;
-    transform: translate(-50%, -50%);
-    box-shadow: 0 4px 15px rgba(8, 145, 178, 0.5);
-    pointer-events: none;
-    transition: transform 0.05s linear;
+/* Active State Visuals */
+.stick-zone:active .stick-base,
+.stick-zone:focus-within .stick-base {
+    border-color: rgba(34, 211, 238, 0.8);
+    background: rgba(34, 211, 238, 0.1);
+    box-shadow: 0 0 25px rgba(34, 211, 238, 0.2);
 }
 
 /* Editor Default (Night Mode) */
